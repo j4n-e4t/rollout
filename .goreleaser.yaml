@@ -1,0 +1,41 @@
+version: 2
+
+project_name: rollout
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/rollout
+    binary: rollout
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X github.com/j4n-e4t/rollout/internal/cli.Version={{ .Version }}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github-native
+
+brews:
+  - name: rollout
+    repository:
+      owner: j4n-e4t
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/j4n-e4t/rollout
+    description: Deploy Docker Compose services to servers over SSH
+    # Only publish the formula when a tap token is configured.
+    skip_upload: '{{ if .Env.HOMEBREW_TAP_TOKEN }}false{{ else }}true{{ end }}'
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/rollout --version")

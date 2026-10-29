@@ -1,0 +1,7 @@
+services:
+  whoami:
+    image: traefik/whoami:v1.10.3
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:80"

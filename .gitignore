@@ -1,0 +1,22 @@
+# Build output
+/bin/
+/dist/
+/rollout
+
+# Go
+*.test
+*.out
+coverage.*
+
+# Local secrets / editor
+.env
+.env.*
+# Example services commit .env files with ${NAME} references, not values.
+!/examples/services/*/.env
+*.pem
+.DS_Store
+.idea/
+.vscode/
+
+# Dashboard browser tests
+node_modules/

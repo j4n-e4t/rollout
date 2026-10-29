@@ -1,0 +1,41 @@
+# Example workflow for an infrastructure repository that holds rollout.json
+# and the services/ directory.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      services:
+        description: Services to deploy (space separated, empty = all)
+        required: false
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # With Tailscale SSH, joining the tailnet is all the auth needed.
+      # Using plain SSH keys instead? Drop this step and pass `ssh-key` below.
+      - uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - uses: j4n-e4t/rollout@main
+        with:
+          # ssh-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # Fills ${NAME} references in services' .env files.
+          secrets: ${{ toJSON(secrets) }}
+          args: deploy ${{ inputs.services || '--all' }}
+
+      - uses: j4n-e4t/rollout@main
+        with:
+          args: ls

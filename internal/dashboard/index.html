@@ -1,0 +1,1901 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>rollout · Infrastructure</title>
+<style>
+:root {
+  --bg:#f0f3f7;
+  --panel:#fff;
+  --card:#fff;
+  --card-hover:#f6f8fb;
+  --fg:#203249;
+  --muted:#5b6d83;
+  --faint:#738399;
+  --line:#d7e0ea;
+  --line-strong:#b2c2d5;
+  --accent:#315fbd;
+  --accent-soft:#eaf0fc;
+  --ok:#207651;
+  --warn:#946211;
+  --bad:#bd394b;
+  --info:#315fbd;
+  --none:#6b7584;
+  --header:#1d2e47;
+  --header-fg:#f0f4fc;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+}
+@media(prefers-color-scheme:dark) {
+  :root {
+    --bg:#172231;
+    --panel:#203044;
+    --card:#25364a;
+    --card-hover:#2b3e55;
+    --fg:#e4ecf6;
+    --muted:#a8b8cc;
+    --faint:#92a4ba;
+    --line:#3c4e64;
+    --line-strong:#6b83a1;
+    --accent:#9bbcff;
+    --accent-soft:#2c4265;
+    --ok:#7ed6ad;
+    --warn:#e6bf78;
+    --bad:#ff9aa9;
+    --info:#9bbcff;
+    --none:#acb8c9;
+  }
+}
+* {
+  box-sizing:border-box
+}
+html {
+  height:100%;
+  scroll-padding-top:110px
+}
+body {
+  margin:0;
+  background:var(--bg);
+  color:var(--fg);
+  font:14px/1.5 "Avenir Next","Segoe UI",sans-serif
+}
+button,select,input {
+  font:inherit
+}
+button,select {
+  color:inherit
+}
+button,a,select,input {
+  touch-action:manipulation
+}
+button {
+  cursor:pointer
+}
+button:disabled {
+  cursor:wait;
+  opacity:.55
+}
+:focus-visible {
+  outline:3px solid var(--accent);
+  outline-offset:4px
+}
+button:focus-visible,a:focus-visible,select:focus-visible {
+  border-radius:5px
+}
+a {
+  color:var(--accent);
+  text-decoration:none
+}
+a:hover {
+  text-decoration:underline
+}
+code,pre,.mono {
+  font-family:var(--mono);
+  font-size:12px
+}
+pre {
+  white-space:pre;
+  tab-size:2
+}
+h1,h2,h3,h4,p {
+  margin:0
+}
+h1 {
+  font-size:32px;
+  line-height:1.2;
+  font-weight:650;
+  letter-spacing:-1px
+}
+h2 {
+  font-size:20px;
+  line-height:1.3;
+  font-weight:650;
+  letter-spacing:-.4px
+}
+h3 {
+  font-size:16px;
+  font-weight:650
+}
+h4 {
+  font-size:14px;
+  font-weight:600
+}
+svg.i {
+  width:17px;
+  height:17px;
+  flex:none;
+  stroke:currentColor;
+  fill:none;
+  stroke-width:1.7;
+  stroke-linecap:round;
+  stroke-linejoin:round
+}
+[hidden] {
+  display:none!important
+}
+.skip {
+  position:fixed;
+  top:-80px;
+  left:20px;
+  z-index:60;
+  background:var(--panel);
+  padding:12px
+}
+.skip:focus {
+  top:12px
+}
+header {
+  position:sticky;
+  top:0;
+  z-index:20;
+  min-height:68px;
+  display:flex;
+  align-items:center;
+  gap:22px;
+  padding:12px 28px;
+  background:var(--header);
+  color:var(--header-fg);
+  box-shadow:0 1px 0 #fff1
+}
+.brand {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  flex:none;
+  border:0;
+  background:none;
+  color:inherit;
+  font-size:18px;
+  font-weight:650;
+  letter-spacing:-.6px;
+  padding:4px 0
+}
+.brand svg {
+  width:25px;
+  height:25px
+}
+.breadcrumbs {
+  display:flex;
+  align-items:center;
+  gap:14px;
+  min-width:0
+}
+.crumb {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0
+}
+.crumb select {
+  appearance:auto;
+  border:0;
+  background:transparent;
+  color:inherit;
+  padding:7px 20px 7px 0;
+  max-width:240px;
+  font-weight:550;
+  text-overflow:ellipsis;
+  cursor:pointer
+}
+.crumb select option {
+  background:var(--panel);
+  color:var(--fg)
+}
+.crumb select:disabled {
+  opacity:.65;
+  cursor:default
+}
+.crumb-separator {
+  color:#9fb2cd;
+  font-size:21px;
+  font-weight:300
+}
+.crumb svg {
+  color:#a9bddb
+}
+.spacer {
+  flex:1
+}
+.header-tools {
+  display:flex;
+  align-items:center;
+  gap:18px
+}
+.toggle {
+  display:flex;
+  align-items:center;
+  gap:7px;
+  font-size:12px;
+  white-space:nowrap
+}
+.toggle input {
+  accent-color:#a8c6ff
+}
+.checked {
+  color:#b8c8de;
+  font-size:12px;
+  white-space:nowrap
+}
+.btn {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  border:1px solid var(--line);
+  background:var(--panel);
+  border-radius:7px;
+  padding:7px 12px;
+  font-weight:550;
+  font-size:12px
+}
+.btn:hover {
+  background:var(--card-hover);
+  border-color:var(--line-strong)
+}
+header .btn {
+  background:#ffffff0c;
+  border-color:#ffffff35;
+  color:inherit
+}
+header .btn:hover {
+  background:#ffffff1a
+}
+.btn.primary {
+  background:var(--accent);
+  color:var(--panel);
+  border-color:var(--accent)
+}
+.btn.spin svg {
+  animation:spin 1s linear infinite
+}
+@keyframes spin {
+  to {
+    transform:rotate(360deg)
+  }
+}
+main {
+  max-width:1740px;
+  min-height:calc(100vh - 68px);
+  margin:auto;
+  padding:36px 40px 72px
+}
+.page-head {
+  display:flex;
+  align-items:flex-start;
+  gap:24px;
+  justify-content:space-between;
+  margin-bottom:28px
+}
+.page-title {
+  display:flex;
+  align-items:center;
+  gap:12px
+}
+.page-title>.i {
+  width:28px;
+  height:28px;
+  color:var(--muted)
+}
+.page-description {
+  color:var(--muted);
+  margin-top:8px;
+  max-width:78ch
+}
+.page-actions {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end
+}
+.env {
+  margin-top:7px;
+  color:var(--faint);
+  font-size:12px;
+  overflow-wrap:anywhere
+}
+.summary {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap
+}
+.metric {
+  padding:0 18px;
+  border-left:1px solid var(--line);
+  color:var(--muted);
+  font-size:12px
+}
+.metric b {
+  font-size:18px;
+  display:block;
+  color:var(--fg);
+  font-weight:600
+}
+.metrics {
+  display:flex;
+  align-items:center
+}
+.badge {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:3px 8px;
+  border-radius:5px;
+  font-size:11px;
+  font-weight:550;
+  white-space:nowrap;
+  color:var(--c);
+  background:color-mix(in srgb,var(--c) 8%,transparent)
+}
+.badge svg.i {
+  width:12px;
+  height:12px
+}
+.c-ok {
+  --c:var(--ok)
+}
+.c-warn {
+  --c:var(--warn)
+}
+.c-bad {
+  --c:var(--bad)
+}
+.c-info {
+  --c:var(--info)
+}
+.c-none {
+  --c:var(--none)
+}
+.c-accent {
+  --c:var(--accent)
+}
+.dot {
+  display:inline-block;
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--c);
+  flex:none
+}
+.muted {
+  color:var(--muted)
+}
+.faint {
+  color:var(--faint)
+}
+.warn-text {
+  color:var(--warn)
+}
+.banner {
+  border-left:3px solid var(--bad);
+  background:color-mix(in srgb,var(--bad) 7%,var(--panel));
+  color:var(--bad);
+  padding:13px 16px;
+  margin-bottom:24px;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere
+}
+.banner p {
+  color:var(--muted);
+  margin-top:4px
+}
+.empty {
+  padding:36px 22px;
+  color:var(--muted);
+  text-align:center
+}
+.empty h2 {
+  color:var(--fg);
+  margin-bottom:8px
+}
+.empty .btn {
+  margin-top:16px
+}
+.section-heading {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:18px;
+  margin-bottom:16px
+}
+.section-heading p {
+  font-size:12px;
+  color:var(--muted)
+}
+.section-heading h2 {
+  font-size:17px
+}
+.server-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));
+  gap:20px
+}
+.server-card {
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:12px;
+  overflow:hidden
+}
+.server-card-top {
+  padding:22px;
+  border-bottom:1px solid var(--line)
+}
+.server-card-title {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:9px
+}
+.server-icon {
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--line);
+  border-radius:8px;
+  color:var(--muted);
+  background:var(--card-hover);
+  flex:none
+}
+.server-card-top .btn {
+  margin-top:18px
+}
+.server-stack-list {
+  padding:5px 18px
+}
+.server-stack-item {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:14px 4px;
+  border-bottom:1px solid var(--line)
+}
+.server-stack-item:last-child {
+  border:0
+}
+.text-link {
+  padding:0;
+  border:0;
+  background:none;
+  color:var(--accent);
+  font-weight:600;
+  text-align:left
+}
+.text-link:hover {
+  text-decoration:underline
+}
+.server-card-foot {
+  padding:12px 22px;
+  color:var(--muted);
+  font-size:12px;
+  background:var(--card-hover)
+}
+.stack-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));
+  gap:18px
+}
+.stack-tile {
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  text-align:left;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:22px;
+  gap:16px
+}
+.stack-tile:hover {
+  border-color:var(--accent)
+}
+.stack-tile-head {
+  display:flex;
+  gap:10px;
+  align-items:center
+}
+.stack-tile-head h2 {
+  font-size:19px;
+  flex:1
+}
+.stack-tile-head>svg {
+  color:var(--muted)
+}
+.stack-tile .summary {
+  gap:6px
+}
+.stack-tile .service-names {
+  color:var(--muted);
+  font-size:12px;
+  min-height:36px;
+  overflow-wrap:anywhere
+}
+.stack-tile-bottom {
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding-top:14px;
+  border-top:1px solid var(--line);
+  font-size:12px
+}
+.stack-tile-bottom .release {
+  font-family:var(--mono);
+  font-size:11px
+}
+.tile-count {
+  color:var(--muted);
+  font-size:12px
+}
+.stack-toolbar {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:13px 18px;
+  margin-bottom:28px;
+  flex-wrap:wrap
+}
+.release-info {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  font-size:12px;
+  color:var(--muted)
+}
+.release-info b {
+  color:var(--fg);
+  font-family:var(--mono)
+}
+.release-message {
+  max-width:50ch;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+.board-top {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:16px
+}
+.board-top h2 {
+  font-size:17px
+}
+.board-top p {
+  font-size:12px;
+  color:var(--muted)
+}
+.service-board {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));
+  gap:30px 24px;
+  align-items:start
+}
+.service-group {
+  min-width:0;
+  scroll-margin-top:100px;
+  border-top:2px solid var(--line-strong);
+  padding:16px 0 0
+}
+.service-group.focused {
+  border-color:var(--accent)
+}
+.service-heading {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-height:28px
+}
+.service-heading .service-title {
+  color:var(--fg);
+  font-size:17px;
+  font-weight:650;
+  letter-spacing:-.3px
+}
+.service-heading .service-symbol {
+  color:var(--accent)
+}
+.service-heading .replica-count {
+  margin-left:auto;
+  color:var(--muted);
+  font-size:11px
+}
+.service-meta {
+  display:flex;
+  gap:7px;
+  align-items:center;
+  margin-top:8px;
+  flex-wrap:wrap
+}
+.service-connections {
+  min-height:26px;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px;
+  margin:10px 0 13px;
+  font-size:11px;
+  color:var(--muted)
+}
+.connection-link {
+  display:inline-flex;
+  gap:5px;
+  align-items:center;
+  padding:3px 7px;
+  border:1px solid var(--line);
+  background:var(--panel);
+  color:var(--accent);
+  border-radius:5px;
+  font-size:11px;
+  max-width:100%;
+  overflow-wrap:anywhere
+}
+.connection-link:hover {
+  border-color:var(--accent);
+  background:var(--accent-soft)
+}
+.connection-link svg {
+  width:12px;
+  height:12px
+}
+.container-list {
+  display:grid;
+  grid-template-columns:1fr;
+  gap:17px
+}
+.container-wrap {
+  min-width:0
+}
+.container-card {
+  width:100%;
+  display:block;
+  position:relative;
+  text-align:left;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:9px;
+  padding:16px
+}
+.container-card:hover {
+  border-color:var(--line-strong);
+  background:var(--card-hover)
+}
+.container-card.selected {
+  border-color:var(--accent);
+  box-shadow:0 0 0 2px var(--accent-soft)
+}
+.container-card.ghost {
+  border-style:dashed;
+  background:transparent
+}
+.container-top {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:7px
+}
+.container-top .i {
+  color:var(--muted);
+  width:14px;
+  height:14px
+}
+.container-name {
+  font-size:12px;
+  font-weight:600;
+  overflow-wrap:anywhere;
+  word-break:break-word
+}
+.container-top .state-text {
+  margin-left:auto;
+  font-size:11px;
+  color:var(--c);
+  display:flex;
+  gap:5px;
+  align-items:center;
+  flex:none
+}
+.container-image {
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--muted);
+  overflow-wrap:anywhere;
+  margin-bottom:14px
+}
+.container-data {
+  display:flex;
+  gap:12px;
+  align-items:center;
+  justify-content:space-between;
+  font-size:11px;
+  color:var(--muted);
+  border-top:1px solid var(--line);
+  padding-top:10px
+}
+.container-data>span {
+  display:flex;
+  align-items:center;
+  gap:5px
+}
+.container-data svg {
+  width:12px;
+  height:12px
+}
+.container-resources {
+  margin:0 12px;
+  border-left:1px solid var(--line-strong);
+  padding:10px 0 0 12px;
+  display:flex;
+  flex-direction:column;
+  gap:7px
+}
+.resource {
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-width:0;
+  border:1px solid var(--line);
+  border-radius:5px;
+  background:var(--panel);
+  padding:6px 8px;
+  font-size:10px
+}
+.resource::before {
+  content:"";
+  position:absolute;
+  width:13px;
+  left:-13px;
+  top:50%;
+  border-top:1px solid var(--line-strong)
+}
+.resource>svg {
+  width:13px;
+  height:13px;
+  color:var(--muted)
+}
+.resource-name {
+  font-family:var(--mono);
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis
+}
+.resource-target {
+  margin-left:auto;
+  color:var(--muted);
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  max-width:46%;
+  font-family:var(--mono)
+}
+.ro {
+  color:var(--warn);
+  font-size:9px;
+  white-space:nowrap
+}
+.container-endpoints {
+  display:flex;
+  gap:5px;
+  flex-wrap:wrap;
+  margin:8px 0 0 12px
+}
+.chip {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  border:1px solid var(--line);
+  background:var(--panel);
+  border-radius:5px;
+  padding:3px 6px;
+  font-size:10px;
+  max-width:100%;
+  overflow-wrap:anywhere;
+  color:var(--muted)
+}
+.chip svg.i {
+  width:11px;
+  height:11px
+}
+.chip .dot {
+  width:5px;
+  height:5px
+}
+.container-links {
+  margin:8px 0 0 12px;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  flex-wrap:wrap
+}
+.container-links .link-label {
+  font-size:10px;
+  color:var(--muted);
+  width:100%
+}
+.no-containers {
+  padding:18px;
+  border:1px dashed var(--line-strong);
+  border-radius:9px;
+  color:var(--muted);
+  font-size:12px
+}
+.no-containers b {
+  display:block;
+  margin-bottom:5px;
+  color:var(--fg)
+}
+.connection-section {
+  margin-top:36px;
+  padding-top:24px;
+  border-top:1px solid var(--line)
+}
+.connection-section .section-heading {
+  margin-bottom:12px
+}
+.connection-section .section-heading p {
+  max-width:65ch
+}
+.connection-list {
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:8px;
+  overflow:hidden
+}
+.connection-row {
+  display:grid;
+  grid-template-columns:minmax(100px,1fr) 22px minmax(100px,1fr) minmax(130px,1fr);
+  gap:15px;
+  align-items:center;
+  padding:11px 16px;
+  border-bottom:1px solid var(--line);
+  font-size:12px
+}
+.connection-row:last-child {
+  border:0
+}
+.connection-row>svg {
+  color:var(--muted);
+  width:15px;
+  height:15px
+}
+.connection-kind {
+  color:var(--muted);
+  font-size:11px;
+  overflow-wrap:anywhere
+}
+.connection-row .text-link {
+  font-size:12px;
+  overflow-wrap:anywhere
+}
+aside {
+  position:fixed;
+  top:68px;
+  right:0;
+  bottom:0;
+  width:min(600px,100vw);
+  z-index:30;
+  background:var(--panel);
+  border-left:1px solid var(--line-strong);
+  box-shadow:-12px 0 35px #1724381a;
+  display:flex;
+  flex-direction:column
+}
+aside:not(.open) {
+  display:none
+}
+.panel-head {
+  padding:22px 22px 0
+}
+.panel-title {
+  display:flex;
+  align-items:center;
+  gap:10px
+}
+.panel-title h2 {
+  font-size:19px
+}
+.panel-title .srv {
+  color:var(--muted);
+  font-size:12px
+}
+.panel-title .close {
+  margin-left:auto;
+  border:0;
+  background:var(--card-hover);
+  border-radius:6px;
+  padding:7px;
+  color:var(--muted)
+}
+.panel-badges {
+  display:flex;
+  gap:6px;
+  margin-top:14px;
+  flex-wrap:wrap
+}
+.tabs {
+  display:flex;
+  gap:2px;
+  margin-top:18px;
+  border-bottom:1px solid var(--line);
+  overflow-x:auto
+}
+.tabs button {
+  border:0;
+  background:none;
+  padding:10px 9px;
+  color:var(--muted);
+  border-bottom:2px solid transparent;
+  font-size:12px
+}
+.tabs button.on {
+  color:var(--accent);
+  border-bottom-color:var(--accent)
+}
+.panel-body {
+  padding:22px;
+  overflow:auto;
+  flex:1
+}
+.section {
+  margin-bottom:24px
+}
+.section h4 {
+  font-size:13px;
+  margin-bottom:10px
+}
+.box {
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--card)
+}
+.box+.box {
+  margin-top:10px
+}
+.box.focus {
+  border-color:var(--accent)
+}
+.box-head {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:12px;
+  border-bottom:1px solid var(--line);
+  flex-wrap:wrap
+}
+.box-head b {
+  font-size:11px;
+  font-family:var(--mono);
+  overflow-wrap:anywhere
+}
+.box-head .right {
+  margin-left:auto;
+  font-size:11px;
+  color:var(--muted)
+}
+.kv {
+  display:grid;
+  grid-template-columns:100px minmax(0,1fr);
+  gap:8px 14px;
+  font-size:12px
+}
+.kv dt {
+  color:var(--muted)
+}
+.kv dd {
+  margin:0;
+  min-width:0;
+  overflow-wrap:anywhere
+}
+.box .kv {
+  padding:14px;
+  margin:0
+}
+pre.code {
+  margin:0;
+  padding:15px;
+  overflow:auto;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:8px;
+  font-size:11px;
+  line-height:1.6
+}
+.cmd {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  border:1px solid var(--line);
+  border-radius:6px;
+  padding:8px;
+  margin-bottom:7px
+}
+.cmd code {
+  min-width:0;
+  flex:1;
+  overflow:auto;
+  font-size:11px
+}
+.cmd button {
+  font-size:11px;
+  padding:3px 7px;
+  border:1px solid var(--line);
+  background:var(--card);
+  border-radius:4px;
+  color:var(--muted)
+}
+.deploys {
+  border:1px solid var(--line);
+  border-radius:8px;
+  overflow:hidden
+}
+.deploy {
+  display:grid;
+  grid-template-columns:9px minmax(0,1fr) auto;
+  gap:6px 10px;
+  padding:15px;
+  border-bottom:1px solid var(--line)
+}
+.deploy:last-child {
+  border:0
+}
+.deploy .dot {
+  margin-top:6px
+}
+.deploy .what {
+  font-weight:600
+}
+.deploy .sub {
+  grid-column:2 / 4;
+  font-size:11px;
+  color:var(--muted);
+  overflow-wrap:anywhere
+}
+.deploy .when {
+  font-size:11px;
+  color:var(--muted)
+}
+table.mini {
+  width:100%;
+  border-collapse:collapse;
+  table-layout:fixed;
+  font-size:11px
+}
+table.mini td {
+  padding:5px 0;
+  vertical-align:top;
+  overflow-wrap:anywhere
+}
+table.mini td:first-child {
+  width:80px;
+  color:var(--muted)
+}
+@media(min-width:1500px) {
+  .service-board {
+    grid-template-columns:repeat(3,minmax(0,1fr))
+  }
+}
+@media(max-width:1000px) {
+  header {
+    padding:12px 20px;
+    gap:15px
+  }
+  .checked {
+    display:none
+  }
+  .header-tools {
+    gap:12px
+  }
+  .crumb select {
+    max-width:170px
+  }
+  main {
+    padding:28px 24px 60px
+  }
+  .page-head {
+    flex-wrap:wrap
+  }
+  .metrics {
+    flex-wrap:wrap
+  }
+}
+@media(max-width:680px) {
+  header {
+    flex-wrap:wrap;
+    gap:8px 16px;
+    padding:10px 16px;
+    position:relative
+  }
+  .brand {
+    font-size:16px
+  }
+  .breadcrumbs {
+    gap:8px;
+    flex:1
+  }
+  header>.spacer {
+    display:none
+  }
+  .crumb {
+    gap:5px;
+    flex:1
+  }
+  .crumb svg {
+    display:none
+  }
+  .crumb select {
+    width:100%;
+    max-width:none;
+    min-width:0;
+    font-size:12px;
+    padding-right:4px
+  }
+  .header-tools {
+    width:100%;
+    justify-content:flex-end
+  }
+  .header-tools .checked {
+    display:block;
+    margin-right:auto;
+    font-size:10px
+  }
+  .header-tools .toggle {
+    font-size:11px
+  }
+  main {
+    padding:24px 16px 48px
+  }
+  .page-head {
+    gap:15px;
+    margin-bottom:22px
+  }
+  h1 {
+    font-size:27px
+  }
+  .page-actions {
+    justify-content:flex-start
+  }
+  .metrics .metric:first-child {
+    padding-left:0;
+    border:0
+  }
+  .section-heading,.board-top {
+    align-items:flex-start;
+    flex-direction:column;
+    gap:6px
+  }
+  .stack-toolbar {
+    padding:12px
+  }
+  .service-board {
+    grid-template-columns:minmax(0,1fr)
+  }
+  .connection-row {
+    grid-template-columns:minmax(80px,1fr) 16px minmax(80px,1fr);
+    gap:10px;
+    padding:12px
+  }
+  .connection-kind {
+    grid-column:1 / -1
+  }
+  .server-grid,.stack-grid {
+    grid-template-columns:minmax(0,1fr)
+  }
+  aside {
+    top:0;
+    z-index:40;
+    width:100vw
+  }
+  .panel-head,.panel-body {
+    padding:16px
+  }
+  .panel-head {
+    padding-bottom:0
+  }
+  .panel-title .srv {
+    display:none
+  }
+  .release-message {
+    white-space:normal
+  }
+  .container-data {
+    gap:5px
+  }
+}
+@media(prefers-reduced-motion:reduce) {
+  *,*::before,*::after {
+    animation:none!important;
+    transition:none!important;
+    scroll-behavior:auto!important
+  }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header>
+  <button class="brand" id="home" aria-label="rollout infrastructure overview"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h10l5 5-5 5H4l5-5z"/><path d="m4 12 5 5h5l5-5M4 17l5 5h5l5-5"/></svg>rollout</button>
+  <nav class="breadcrumbs" aria-label="Server and stack">
+    <label class="crumb" for="server-select"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 17.5h.01"/></svg><select id="server-select" aria-label="Select server"><option value="">All servers</option></select></label>
+    <span class="crumb-separator" aria-hidden="true">/</span>
+    <label class="crumb" for="stack-select"><svg class="i" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5"/></svg><select id="stack-select" aria-label="Select stack" disabled><option value="">All stacks</option></select></label>
+  </nav>
+  <div class="spacer"></div>
+  <div class="header-tools">
+    <span class="checked" id="checked" role="status">Loading configuration…</span>
+    <label class="toggle"><input type="checkbox" id="auto">Auto-refresh</label>
+    <button class="btn" id="refresh"><svg class="i" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>Refresh</button>
+  </div>
+</header>
+<main id="main" tabindex="-1" aria-label="Infrastructure"></main>
+<aside id="panel" aria-label="Stack details" inert></aside>
+<script>
+"use strict";
+
+// ---------- tiny DOM helpers ----------
+function h(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") e.className = v;
+    else if (k === "style") e.style.cssText = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k === "data") Object.assign(e.dataset, v);
+    else if (k in e && typeof v !== "string") e[k] = v;
+    else e.setAttribute(k, v);
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid == null || kid === false) continue;
+    e.append(kid instanceof Node ? kid : String(kid));
+  }
+  return e;
+}
+const ICONS = {
+  server: '<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',
+  heart: '<path d="M19.5 12.6 12 20l-7.5-7.4A5 5 0 1 1 12 6a5 5 0 1 1 7.5 6.6z"/>',
+  sync: '<path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5M3 21v-5h5"/>',
+  outofsync: '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  disk: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  port: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  git: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7M18 10.5c0 4-6 3-11 6"/>',
+  box: '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  ghost: '<path d="M12 3a7 7 0 0 0-7 7v11l3-2 2 2 2-2 2 2 2-2 3 2V10a7 7 0 0 0-7-7z"/>',
+};
+function icon(name) {
+  const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  s.setAttribute("class", "i");
+  s.setAttribute("viewBox", "0 0 24 24");
+  s.innerHTML = ICONS[name] || ""; // constant strings only
+  return s;
+}
+const PALETTE = ["#7c3aed", "#2563eb", "#0891b2", "#059669", "#65a30d", "#ca8a04", "#ea580c", "#dc2626", "#db2777", "#9333ea", "#4f46e5", "#0d9488"];
+// Networks get distinct colors in a stable (sorted) order; hashing would
+// collide too often for the handful of networks on a page.
+const netColors = new Map();
+const NET_PALETTE = ["#8b5cf6", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#ec4899", "#14b8a6", "#84cc16", "#f97316", "#06b6d4"];
+function assignNetColors(groups) {
+  const names = new Set();
+  for (const g of groups) for (const a of g.apps) for (const n of a.nodes) {
+    for (const c of n.containers) for (const x of c.networks || []) names.add(x.name);
+    if (!n.containers.length) for (const x of n.desired?.networks || []) names.add(x);
+  }
+  netColors.clear();
+  [...names].sort().forEach((n, i) => netColors.set(n, NET_PALETTE[i % NET_PALETTE.length]));
+}
+const netColor = name => netColors.get(name) || colorFor(name);
+function colorFor(s) {
+  let x = 0;
+  for (const ch of s) x = (x * 31 + ch.charCodeAt(0)) >>> 0;
+  return PALETTE[x % PALETTE.length];
+}
+function ago(iso) {
+  if (!iso) return "";
+  const s = (Date.now() - new Date(iso)) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + "m ago";
+  if (s < 172800) return Math.floor(s / 3600) + "h ago";
+  return Math.floor(s / 86400) + "d ago";
+}
+const short = (hash, n = 12) => (hash || "").replace(/^sha256:/, "").slice(0, n);
+function release(rec) {
+  if (!rec) return "";
+  let l = rec.version || (rec.commit ? rec.commit.slice(0, 7) : short(rec.hash));
+  return rec.dirty ? l + "-dirty" : l;
+}
+// ---------- state ----------
+const state = {
+  model: null, status: null, statusError: "", loading: false, checkedAt: null,
+  server: null, stack: null, focusedService: null,
+  auto: localStorage.getItem("rollout.auto") !== "false",
+  panel: null, // {server, service, tab, node}
+  history: {}, // "server/service" -> records | {error}
+};
+
+// ---------- health & sync (Argo CD vocabulary) ----------
+const HEALTH = {
+  Healthy: { cls: "c-ok", icon: "heart" },
+  Progressing: { cls: "c-info", icon: "heart" },
+  Degraded: { cls: "c-bad", icon: "heart" },
+  Suspended: { cls: "c-warn", icon: "heart" },
+  Missing: { cls: "c-none", icon: "ghost" },
+  Unknown: { cls: "c-none", icon: "heart" },
+};
+const SYNC = {
+  Synced: { cls: "c-ok", icon: "sync" },
+  OutOfSync: { cls: "c-warn", icon: "outofsync" },
+  Orphaned: { cls: "c-accent", icon: "outofsync" },
+  Unknown: { cls: "c-none", icon: "sync" },
+};
+function badge(kind, label, title) {
+  const m = (kind === "health" ? HEALTH : SYNC)[label] || { cls: "c-none", icon: "heart" };
+  return h("span", { class: "badge " + m.cls, title: title || "" }, icon(m.icon), label);
+}
+function appHealth(row) {
+  if (!row) return "Unknown";
+  return { running: "Healthy", starting: "Progressing", degraded: "Degraded", unhealthy: "Degraded",
+    stopped: "Suspended", "not deployed": "Missing", unreachable: "Unknown" }[row.state] || "Unknown";
+}
+function appSync(app) {
+  const row = app.row;
+  if (!app.svc) return { label: "Orphaned", title: "Running on the server but no longer assigned to it in rollout.json" };
+  if (!row || row.state === "unreachable") return { label: "Unknown", title: "Server state could not be read" };
+  if (!row.record) return { label: "OutOfSync", title: "Never deployed by rollout" };
+  if (row.record.hash === app.svc.hash) return { label: "Synced", title: "Server runs exactly the files in your working tree\n" + app.svc.hash };
+  return { label: "OutOfSync", title: "Local files differ from the live release\nlocal " + app.svc.hash + "\nlive  " + row.record.hash };
+}
+
+// Aggregate health for a Compose service, or for one container.
+function nodeState(node, app) {
+  const cs = node.containers;
+  if (!cs.length) {
+    if (!app.row || app.row.state === "unreachable") return { label: "Unknown", cls: "c-none" };
+    if (!app.row.record && !app.row.containers?.length) return { label: "Not deployed", cls: "c-none" };
+    return { label: "Missing", cls: "c-bad" };
+  }
+  const running = cs.filter(c => c.state === "running");
+  if (cs.some(c => c.state === "restarting")) return { label: "Restarting", cls: "c-bad" };
+  if (running.some(c => c.health === "unhealthy")) return { label: "Unhealthy", cls: "c-bad" };
+  if (running.length && running.length < cs.length) return { label: "Degraded", cls: "c-warn" };
+  if (running.some(c => c.health === "starting")) return { label: "Starting", cls: "c-info", pulse: true };
+  if (running.length) return { label: running.every(c => c.health === "healthy") ? "Healthy" : "Running", cls: "c-ok", pulse: true };
+  if (cs.every(c => /^Exited \(0\)/.test(c.status))) return { label: "Completed", cls: "c-none" };
+  if (cs.some(c => c.state === "exited")) return { label: "Crashed", cls: "c-bad" };
+  return { label: cs[0].state, cls: "c-none" };
+}
+
+// ---------- model merging ----------
+// apps(): every (server, service) pair from config plus orphans found live.
+function apps() {
+  const m = state.model;
+  const rows = new Map((state.status || []).map(r => [r.server + "/" + r.service, r]));
+  const out = [];
+  for (const srv of m.servers || []) {
+    const list = [];
+    for (const svc of m.services || []) {
+      if (svc.servers.includes(srv.name)) list.push({ server: srv, svc, name: svc.name, row: rows.get(srv.name + "/" + svc.name) });
+    }
+    for (const r of state.model.showUnconfigured ? state.status || [] : []) {
+      if (r.server === srv.name && !r.inConfig) list.push({ server: srv, svc: null, name: r.service, row: r });
+    }
+    list.sort((a, b) => a.name.localeCompare(b.name));
+    for (const a of list) {
+      a.health = appHealth(a.row);
+      a.sync = appSync(a);
+      a.nodes = buildNodes(a);
+    }
+    out.push({ server: srv, apps: list });
+  }
+  return out;
+}
+
+function buildNodes(app) {
+  const topo = app.svc?.topology?.services || [];
+  const live = app.row?.containers || [];
+  const names = new Set([...topo.map(s => s.name), ...live.map(c => c.service || c.name)]);
+  const nodes = [...names].sort().map(name => {
+    const desired = topo.find(s => s.name === name) || null;
+    const containers = live.filter(c => (c.service || c.name) === name);
+    const deps = [...new Set([...(desired?.dependsOn || []), ...containers.flatMap(c => c.dependsOn || [])])];
+    return { name, desired, containers, deps: deps.filter(d => names.has(d)), drift: !desired && !!app.svc };
+  });
+  return nodes;
+}
+
+// ---------- navigation and hierarchy ----------
+let renderedGroups = [];
+const serviceID = name => "service-" + encodeURIComponent(name);
+function navigate(server = null, stack = null) {
+  state.server = server || null;
+  state.stack = stack || null;
+  state.panel = null;
+  state.focusedService = null;
+  syncHash(true);
+  render();
+  document.getElementById("main").focus({ preventScroll: true });
+}
+function focusService(app, name) {
+  if (state.server !== app.server.name || state.stack !== app.name) navigate(app.server.name, app.name);
+  state.focusedService = name;
+  document.querySelectorAll(".service-group").forEach(el => el.classList.toggle("focused", el.dataset.service === name));
+  const el = document.getElementById(serviceID(name));
+  if (el) { el.focus({ preventScroll: true }); el.scrollIntoView({ block: "nearest", behavior: "auto" }); }
+}
+function renderBreadcrumbs(groups) {
+  const servers = document.getElementById("server-select");
+  const stacks = document.getElementById("stack-select");
+  servers.replaceChildren(h("option", { value: "" }, "All servers"), ...groups.map(g => h("option", { value: g.server.name }, g.server.name)));
+  if (state.server && !groups.some(g => g.server.name === state.server)) servers.append(h("option", { value: state.server }, state.server + " (removed)"));
+  servers.value = state.server || "";
+  const g = groups.find(g => g.server.name === state.server);
+  stacks.replaceChildren(h("option", { value: "" }, "All stacks"), ...(g?.apps || []).map(a => h("option", { value: a.name }, a.name)));
+  if (state.stack && !g?.apps.some(a => a.name === state.stack)) stacks.append(h("option", { value: state.stack }, state.stack + (state.loading ? " (checking)" : " (not found)")));
+  stacks.value = state.stack || "";
+  stacks.disabled = !g;
+}
+function countContainers(apps) { return apps.flatMap(a => a.row?.containers || []); }
+function metrics(entries) {
+  return h("div", { class: "metrics" }, entries.map(([n, label]) => h("div", { class: "metric" }, h("b", {}, n), label)));
+}
+function pageHead(title, description, actions, symbol = "server") {
+  return h("div", { class: "page-head" },
+    h("div", {}, h("div", { class: "page-title" }, icon(symbol), h("h1", {}, title)), h("p", { class: "page-description" }, description)),
+    actions ? h("div", { class: "page-actions" }, actions) : null);
+}
+function serverHealth(g) {
+  const rows = g.apps.map(a => a.row).filter(Boolean);
+  if (!state.status) return h("span", { class: "badge c-none" }, "Checking server");
+  if (!g.apps.length) return h("span", { class: "badge c-none" }, "No stacks");
+  if (!rows.length) return h("span", { class: "badge c-none" }, "State unavailable");
+  const failed = rows.filter(r => r.state === "unreachable").length;
+  const cls = failed === rows.length ? "c-bad" : failed ? "c-warn" : "c-ok";
+  return h("span", { class: "badge " + cls }, h("span", { class: "dot" }), failed === rows.length ? "Unreachable" : failed ? "Partial state" : "Connected");
+}
+function render() {
+  const main = document.getElementById("main");
+  main.replaceChildren();
+  if (!state.model) {
+    main.append(state.statusError ? h("div", { class: "banner", role: "alert" }, "Could not load the dashboard. ", state.statusError, h("p", {}, "Check rollout.json and select Refresh to retry.")) : h("div", { class: "empty", role: "status" }, "Loading configuration…"));
+    return;
+  }
+  renderedGroups = apps();
+  assignNetColors(renderedGroups);
+  renderBreadcrumbs(renderedGroups);
+  if (state.statusError) main.append(h("div", { class: "banner", role: "alert" }, "Could not refresh server state: " + state.statusError,
+    h("p", {}, state.checkedAt ? "Showing the last known state. Check the server connection and refresh." : "Check the server connection and refresh to retry.")));
+  const group = renderedGroups.find(g => g.server.name === state.server);
+  const app = group?.apps.find(a => a.name === state.stack);
+  if (!state.server) renderFleet(main, renderedGroups);
+  else if (!group) main.append(h("div", { class: "empty" }, h("h2", {}, "Server no longer configured"), "Select another server in the breadcrumb.", h("br"), h("button", { class: "btn", onclick: () => navigate() }, "All servers")));
+  else if (!state.stack) renderServer(main, group);
+  else if (app) renderStack(main, app);
+  else main.append(pageHead(state.stack, group.server.name), h("div", { class: "empty" }, h("h2", {}, state.loading ? "Checking stack…" : "Stack not found"), "Choose a stack from the breadcrumb or return to this server.", h("br"), h("button", { class: "btn", onclick: () => navigate(state.server) }, "All stacks")));
+  document.title = (state.stack || state.server || "Infrastructure") + " · rollout";
+  renderPanel();
+}
+function renderFleet(main, groups) {
+  const all = groups.flatMap(g => g.apps), cs = countContainers(all);
+  main.append(pageHead("Infrastructure", "Choose a server, then a stack to inspect its services and containers.",
+    metrics([[groups.length, "Servers"], [all.length, "Stacks"], [cs.length, "Containers"]])),
+    h("div", { class: "section-heading" }, h("h2", {}, "Servers"), h("span", { class: "env", title: state.model.configPath }, state.model.configPath)));
+  if (!groups.length) { main.append(h("div", { class: "empty" }, "Add a server to rollout.json, then refresh.")); return; }
+  main.append(h("div", { class: "server-grid" }, groups.map(g => {
+    const cs = countContainers(g.apps);
+    return h("section", { class: "server-card" },
+      h("div", { class: "server-card-top" }, h("div", { class: "server-card-title" }, h("div", { class: "server-icon" }, icon("server")), h("h2", {}, g.server.name), h("div", { class: "spacer" }), serverHealth(g)),
+        h("div", { class: "muted mono" }, g.server.address), h("button", { class: "btn", onclick: () => navigate(g.server.name) }, "View stacks", icon("port"))),
+      h("div", { class: "server-stack-list" }, g.apps.length ? g.apps.map(app => h("div", { class: "server-stack-item" }, icon("box"),
+        h("button", { class: "text-link", onclick: () => navigate(g.server.name, app.name) }, app.name), h("div", { class: "spacer" }), badge("health", app.health))) : h("div", { class: "empty" }, "No stacks assigned to this server.")),
+      h("div", { class: "server-card-foot" }, `${g.apps.length} stacks`, h("span", { style: "float:right" }, `${cs.filter(c => c.state === "running").length}/${cs.length} containers running`)));
+  })));
+}
+function renderServer(main, group) {
+  const cs = countContainers(group.apps);
+  main.append(pageHead(group.server.name, group.server.address,
+    [serverHealth(group), metrics([[group.apps.length, "Stacks"], [cs.filter(c => c.state === "running").length + "/" + cs.length, "Containers running"]])]),
+    h("div", { class: "section-heading" }, h("h2", {}, "Stacks"), h("p", {}, "Each stack is a Compose project deployed to this server.")));
+  const errors = [...new Set(group.apps.map(a => a.row?.error).filter(Boolean))];
+  errors.forEach(error => main.append(h("div", { class: "banner", role: "alert" }, error)));
+  if (!group.apps.length) { main.append(h("div", { class: "empty" }, "Assign a stack to this server in rollout.json, then refresh.")); return; }
+  main.append(h("div", { class: "stack-grid" }, group.apps.map(app => {
+    const cs = app.row?.containers || [], rec = app.row?.record;
+    return h("button", { class: "stack-tile", onclick: () => navigate(group.server.name, app.name), "aria-label": "Open stack " + app.name },
+      h("div", { class: "stack-tile-head" }, icon("box"), h("h2", {}, app.name), h("span", { class: "tile-count" }, app.nodes.length + " services")),
+      h("div", { class: "summary" }, badge("health", app.health), badge("sync", app.sync.label, app.sync.title)),
+      h("div", { class: "service-names" }, app.nodes.map(n => n.name).join(", ") || "No services discovered"),
+      h("div", { class: "stack-tile-bottom" }, h("span", { class: "release" }, rec ? release(rec) : "No release record"), h("span", { class: "muted" }, `${cs.filter(c => c.state === "running").length}/${cs.length} containers running`)));
+  })));
+}
+function networksFor(node, container) {
+  if (container) return (container.networks || []).map(n => n.name);
+  return [...new Set(node.containers.flatMap(c => (c.networks || []).map(n => n.name)))];
+}
+// Shared network membership is reachability, not evidence of observed traffic.
+function serviceConnections(app, node, container) {
+  const nets = networksFor(node, container);
+  const deps = container?.dependsOn || node.deps;
+  const links = [];
+  for (const group of renderedGroups) {
+    if (group.server.name !== app.server.name) continue;
+    for (const target of group.apps) for (const other of target.nodes) {
+      if (target.name === app.name && other.name === node.name) continue;
+      const dependency = target.name === app.name && deps.includes(other.name);
+      const shared = networksFor(other).filter(net => nets.includes(net));
+      if (dependency || shared.length) links.push({ app: target, node: other, dependency, networks: shared });
+    }
+  }
+  return links;
+}
+function connectionButton(link, crossStack = true) {
+  const label = crossStack && link.app.name !== state.stack ? link.app.name + "/" + link.node.name : link.node.name;
+  return h("button", { class: "connection-link", title: link.dependency ? "Declared dependency" : "Shared network: " + link.networks.join(", "),
+    "aria-label": `Go to ${link.node.name} service in ${link.app.name}`, onclick: () => focusService(link.app, link.node.name) }, icon(link.dependency ? "port" : "globe"), label);
+}
+function renderStack(main, app) {
+  const cs = app.row?.containers || [], rec = app.row?.record;
+  const heading = pageHead(app.name, `${app.nodes.length} Compose services on ${app.server.name}. Each card is one container.`,
+    [h("button", { class: "btn", onclick: () => openPanel(app, "deployments") }, icon("git"), "Deployments"), h("button", { class: "btn", onclick: () => openPanel(app, "overview") }, "Stack details")], "box");
+  main.append(heading,
+    h("div", { class: "stack-toolbar" }, h("div", { class: "summary" }, badge("health", app.health), badge("sync", app.sync.label, app.sync.title)),
+      h("div", { class: "release-info" }, icon("git"), h("b", {}, rec ? release(rec) : "No release record"),
+        rec ? h("span", { title: new Date(rec.deployedAt).toLocaleString() }, "Deployed " + ago(rec.deployedAt)) : null,
+        rec?.message ? h("span", { class: "release-message", title: rec.message }, rec.message.split("\n")[0]) : null)));
+  if (app.row?.error) main.append(h("div", { class: "banner", role: "alert" }, app.row.error));
+  if (app.svc?.error) main.append(h("div", { class: "banner", role: "alert" }, "Could not read local Compose topology: " + app.svc.error));
+  main.append(h("div", { class: "board-top" }, h("h2", {}, "Services"), h("p", {}, `${cs.filter(c => c.state === "running").length} of ${cs.length} containers running. Select a container for runtime details.`)));
+  main.append(app.nodes.length ? h("div", { class: "service-board" }, app.nodes.map(n => renderService(n, app))) : h("div", { class: "empty" }, state.loading ? "Checking containers…" : "No services discovered. Check the stack's Compose file and server connection."));
+  renderConnections(main, app);
+}
+function renderService(n, app) {
+  const st = nodeState(n, app), links = serviceConnections(app, n);
+  const dependencies = links.filter(l => l.dependency);
+  const wanted = n.desired?.replicas || 1;
+  return h("section", { id: serviceID(n.name), tabindex: "-1", class: "service-group" + (state.focusedService === n.name ? " focused" : ""), data: { service: n.name }, "aria-label": "Service " + n.name },
+    h("div", { class: "service-heading" }, h("span", { class: "service-symbol" }, icon("box")), h("h2", { class: "service-title" }, n.name),
+      h("span", { class: "replica-count" }, `${n.containers.length} ${n.containers.length === 1 ? "container" : "containers"}`)),
+    h("div", { class: "service-meta" }, h("span", { class: "badge " + st.cls }, h("span", { class: "dot" }), st.label),
+      n.drift ? h("span", { class: "badge c-warn" }, "Not in local Compose") : null,
+      n.desired?.replicas > n.containers.length ? h("span", { class: "muted", style: "font-size:11px" }, wanted + " expected") : null),
+    h("div", { class: "service-connections" }, dependencies.length ? ["Depends on", dependencies.map(l => connectionButton(l))] : "No declared dependencies"),
+    h("div", { class: "container-list" }, n.containers.length ? n.containers.map(c => renderContainer(c, n, app)) : h("div", { class: "no-containers" },
+      h("b", {}, !app.row || app.row.state === "unreachable" ? "Live containers unavailable" : "No deployed containers"),
+      n.desired?.image ? h("span", { class: "mono" }, n.desired.image) : "Inspect the server connection and deployment status.")));
+}
+function publicPortURL(app, port) {
+  if (!port.hostPort || !/^\d+$/.test(port.hostPort) || !port.container.endsWith("/tcp")) return null;
+  if (/^(127\.|::1$)/.test(port.hostIp || "")) return null;
+  let host = app.server.host;
+  if (/[\s/@?#]/.test(host)) return null;
+  if (host.includes(":") && !host.startsWith("[")) host = "[" + host + "]";
+  try { return new URL(`${port.container === "443/tcp" ? "https" : "http"}://${host}:${port.hostPort}`).href; } catch { return null; }
+}
+function renderContainer(c, n, app) {
+  const st = nodeState({ containers: [c] }, app);
+  const selected = state.panel?.server === app.server.name && state.panel?.service === app.name && state.panel?.container === c.name;
+  const nets = c.networks || [], links = serviceConnections(app, n, c);
+  const mounts = (c.mounts || []).filter(m => ["volume", "bind", "tmpfs"].includes(m.type));
+  return h("div", { class: "container-wrap", data: { container: c.name } },
+    h("button", { class: "container-card" + (selected ? " selected" : ""), "aria-label": "Inspect container " + c.name, onclick: () => openPanel(app, "containers", n.name, c.name) },
+      h("div", { class: "container-top" }, icon("box"), h("span", { class: "container-name" }, c.name),
+        h("span", { class: "state-text " + st.cls }, h("span", { class: "dot" }), st.label)),
+      h("div", { class: "container-image", title: c.image }, c.image || "Image unavailable"),
+      h("div", { class: "container-data" }, h("span", {}, c.startedAt ? "Started " + ago(c.startedAt) : "Start time unavailable"),
+        h("span", { class: c.restartCount ? "warn-text" : "" }, icon("sync"), `${c.restartCount ?? 0} restarts`))),
+    mounts.length ? h("div", { class: "container-resources", "aria-label": "Mounts for " + c.name }, mounts.map(m => {
+      const source = m.type === "volume" ? m.name || "Anonymous volume" : m.type === "tmpfs" ? "Temporary storage" : m.source || "Bind mount";
+      return h("div", { class: "resource", title: `${m.type}: ${source} → ${m.destination}${m.rw ? " (read/write)" : " (read-only)"}` },
+        icon(m.type === "bind" ? "folder" : "disk"), h("span", { class: "resource-name" }, source), h("span", { class: "resource-target" }, m.destination), !m.rw ? h("span", { class: "ro" }, "read-only") : null);
+    })) : null,
+    (c.ports?.length || nets.length) ? h("div", { class: "container-endpoints" },
+      (c.ports || []).map(p => { const url = publicPortURL(app, p); return h(url ? "a" : "span", { class: "chip", href: url, target: url ? "_blank" : null, rel: url ? "noopener noreferrer" : null,
+        title: p.hostPort ? `${p.hostIp || "*"}:${p.hostPort} → ${p.container}${url ? "" : " (check host access)"}` : "Internal container port" }, icon("port"), p.hostPort ? p.hostPort + ":" + p.container : p.container); }),
+      nets.map(net => h("span", { class: "chip", title: [net.name, net.ip, ...(net.aliases || [])].filter(Boolean).join("\n") }, h("span", { class: "dot", style: `--c:${netColor(net.name)}` }), net.name))) : null,
+    links.length ? h("div", { class: "container-links" }, h("span", { class: "link-label" }, "Service links"), links.map(l => connectionButton(l))) : null);
+}
+function renderConnections(main, app) {
+  const seen = new Set(), connections = [];
+  for (const n of app.nodes) for (const link of serviceConnections(app, n)) {
+    const key = link.dependency ? n.name + "/" + link.node.name : [app.name + "/" + n.name, link.app.name + "/" + link.node.name].sort().join("|");
+    if (seen.has(key)) continue;
+    seen.add(key); connections.push({ from: n, ...link });
+  }
+  main.append(h("section", { class: "connection-section", "aria-label": "Service connections" },
+    h("div", { class: "section-heading" }, h("h2", {}, "Service connections"), h("p", {}, "Arrows show declared dependencies. Shared networks show access between services, not measured traffic.")),
+    connections.length ? h("div", { class: "connection-list" }, connections.map(link => h("div", { class: "connection-row" },
+      h("button", { class: "text-link", onclick: () => focusService(app, link.from.name) }, link.from.name), icon(link.dependency ? "port" : "globe"),
+      h("button", { class: "text-link", onclick: () => focusService(link.app, link.node.name) }, (link.app.name !== app.name ? link.app.name + "/" : "") + link.node.name),
+      h("span", { class: "connection-kind" }, link.dependency ? "Declared dependency" : "Shared: " + link.networks.join(", "))))) : h("div", { class: "no-containers" }, "No dependencies or shared networks found for this stack.")));
+}
+
+// ---------- side panel ----------
+function openPanel(app, tab, node, container) {
+  state.server = app.server.name;
+  state.stack = app.name;
+  state.panel = { server: app.server.name, service: app.name, tab, node: node || null, container: container || null };
+  if (tab === "deployments") loadHistory(app);
+  syncHash();
+  render();
+  document.querySelector("#panel .close")?.focus({ preventScroll: true });
+}
+function closePanel() {
+  const focus = state.panel?.node;
+  state.panel = null; syncHash(); render();
+  if (focus) document.getElementById(serviceID(focus))?.focus({ preventScroll: true });
+  else document.getElementById("main").focus({ preventScroll: true });
+}
+
+// Server and stack selection is shareable. Old detail-panel URLs still work.
+const panelTabs = new Set(["overview", "containers", "deployments", "compose", "files"]);
+function syncHash(push = false) {
+  const p = state.panel;
+  const parts = [state.server, state.stack];
+  if (p) parts.push(p.tab, p.node, p.container);
+  const hash = parts[0] ? "#/" + parts.filter(Boolean).map(encodeURIComponent).join("/") : "";
+  const url = location.pathname + location.search + hash;
+  if (location.hash !== hash) history[push ? "pushState" : "replaceState"](null, "", url);
+}
+function readHash() {
+  let parts = [];
+  try { parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent); } catch { /* Ignore malformed links. */ }
+  const [server, stack, tab, node, container] = parts;
+  state.server = server || null; state.stack = stack || null; state.focusedService = null;
+  state.panel = server && stack && tab ? { server, service: stack, tab: panelTabs.has(tab) ? tab : "overview", node: node || null, container: container || null } : null;
+}
+
+function currentApp() {
+  if (!state.panel) return null;
+  for (const g of apps()) for (const a of g.apps) if (a.server.name === state.panel.server && a.name === state.panel.service) return a;
+  return null;
+}
+
+function renderPanel() {
+  const el = document.getElementById("panel");
+  const app = currentApp();
+  el.classList.toggle("open", !!app);
+  el.inert = !app;
+  if (!app) { el.replaceChildren(); return; }
+  const tabs = [["overview", "Overview"], ["containers", "Containers"], ["deployments", "Deployments"], ["compose", "Compose"], ["files", "Files"]];
+  const tab = state.panel.tab;
+  el.replaceChildren(
+    h("div", { class: "panel-head" },
+      h("div", { class: "panel-title" },
+        h("div", { class: "server-icon" }, icon("box")),
+        h("h2", {}, app.name), h("span", { class: "srv" }, "on " + app.server.name),
+        h("button", { class: "close", onclick: closePanel, title: "Close details (Esc)", "aria-label": "Close details" }, icon("x"))),
+      h("div", { class: "panel-badges" }, badge("health", app.health), badge("sync", app.sync.label, app.sync.title),
+        app.row?.record ? h("span", { class: "badge c-accent" }, icon("git"), release(app.row.record)) : null),
+      h("div", { class: "tabs", "aria-label": "Stack detail views" }, tabs.map(([k, label]) => h("button", { class: tab === k ? "on" : "", "aria-pressed": tab === k, onclick: () => {
+        state.panel.tab = k; state.panel.node = k === "containers" ? state.panel.node : null;
+        state.panel.container = k === "containers" ? state.panel.container : null;
+        if (k === "deployments") loadHistory(app);
+        syncHash();
+        renderPanel();
+      } }, label)))),
+    h("div", { class: "panel-body" }, { overview: panelOverview, containers: panelContainers, deployments: panelDeployments, compose: panelCompose, files: panelFiles }[tab](app)));
+}
+
+function kv(pairs) {
+  return h("dl", { class: "kv" }, pairs.filter(Boolean).map(([k, v]) => [h("dt", {}, k), h("dd", {}, v ?? "–")]));
+}
+
+function panelOverview(app) {
+  const rec = app.row?.record;
+  const svc = app.svc;
+  const first = app.nodes.flatMap(n => n.containers)[0];
+  const cmds = [`rollout deploy ${app.name}`, `rollout logs ${app.name} -f`];
+  if (first) cmds.push(`rollout exec ${app.name} ${first.service}`);
+  if (!svc) cmds.splice(0, cmds.length, `ssh ${app.server.address.replace(/:\d+$/, "")} 'cd ${app.server.deployPath}/${app.name} && docker compose -p ${app.name} down'`);
+  return [
+    h("div", { class: "section" }, h("h4", {}, "Live release"),
+      h("div", { class: "box" }, rec ? kv([
+        ["Release", h("b", {}, release(rec))],
+        ["Version", rec.version || "–"],
+        ["Message", rec.message ? h("span", { style: "white-space:pre-wrap" }, rec.message) : "–"],
+        ["Commit", rec.commit ? h("code", { title: rec.commit }, rec.commit.slice(0, 12) + (rec.dirty ? " (uncommitted changes)" : "")) : "–"],
+        ["Deployed", `${new Date(rec.deployedAt).toLocaleString()} (${ago(rec.deployedAt)})`],
+        ["By", rec.deployedBy],
+        rec.source ? ["CI run", h("a", { href: rec.source, target: "_blank" }, rec.source.replace(/^https:\/\/github.com\//, ""))] : null,
+        ["rollout", rec.rollout],
+      ]) : h("div", { class: "empty" }, svc ? "Never deployed by rollout." : "No deploy record."))),
+    h("div", { class: "section" }, h("h4", {}, "Sync"),
+      h("div", { class: "box" }, kv([
+        ["Status", badge("sync", app.sync.label)],
+        ["Local bundle", svc ? h("code", { title: svc.hash }, short(svc.hash)) : "not in rollout.json"],
+        ["Live bundle", rec ? h("code", { title: rec.hash }, short(rec.hash)) : "–"],
+        svc && rec && svc.hash !== rec.hash ? ["", h("span", { class: "warn-text" }, "Files changed since this release. Run rollout deploy to sync.")] : null,
+        !svc ? ["", h("span", { class: "warn-text" }, "Not assigned to this server any more. Its containers still run.")] : null,
+      ]))),
+    h("div", { class: "section" }, h("h4", {}, "Configuration"),
+      h("div", { class: "box" }, kv([
+        ["Server", `${app.server.name} (${app.server.address})`],
+        ["Directory", h("code", {}, app.server.deployPath + "/" + app.name)],
+        svc ? ["Source", h("code", {}, svc.path + "/" + svc.composeFile)] : null,
+        svc ? ["Servers", svc.servers.join(", ")] : null,
+        svc ? ["Wait", svc.wait ? "compose up --wait (health-gated)" : "no"] : null,
+        ["Containers", app.nodes.map(n => n.name).join(", ") || "–"],
+        ["Networks", [...new Set(app.nodes.flatMap(n => n.containers.flatMap(c => (c.networks || []).map(x => x.name))))].join(", ") || (svc?.topology?.networks || []).join(", ") || "–"],
+        ["Volumes", (svc?.topology?.volumes || []).join(", ") || "–"],
+      ]))),
+    h("div", { class: "section" }, h("h4", {}, "Commands"), cmds.map(c => h("div", { class: "cmd" }, h("code", {}, c),
+      h("button", { onclick: e => { navigator.clipboard.writeText(c).then(() => { e.target.textContent = "Copied"; }).catch(() => { e.target.textContent = "Select text to copy"; }); setTimeout(() => (e.target.textContent = "Copy"), 1600); } }, "Copy")))),
+  ];
+}
+
+function panelContainers(app) {
+  const focus = state.panel.node;
+  const nodes = app.nodes;
+  if (!nodes.length) return h("div", { class: "empty" }, "No containers.");
+  const base = app.server.deployPath + "/" + app.name + "/";
+  return nodes.map(n => {
+    const st = nodeState(n, app);
+    const boxes = n.containers.length ? n.containers.map(c => h("div", { class: "box" + ((state.panel.container ? state.panel.container === c.name : focus === n.name) ? " focus" : "") },
+      h("div", { class: "box-head" }, h("span", { class: "dot " + nodeState({ containers: [c] }, app).cls }), h("b", {}, c.name),
+        h("span", { class: "right" }, c.status)),
+      h("div", { style: "padding:10px 14px" }, h("table", { class: "mini" },
+        row("Image", h("span", { class: "mono" }, c.image, c.imageId ? h("span", { class: "faint", title: c.imageId }, "  " + short(c.imageId)) : null)),
+        row("Health", c.health || "no healthcheck"),
+        row("Started", c.startedAt ? `${new Date(c.startedAt).toLocaleString()} (${ago(c.startedAt)})` : "–"),
+        row("Restarts", String(c.restartCount ?? 0)),
+        row("Ports", (c.ports || []).length ? (c.ports || []).map(p => h("div", { class: "mono" }, p.hostPort ? `${p.hostIp || "*"}:${p.hostPort} → ${p.container}` : `${p.container} (internal)`)) : "–"),
+        row("Networks", (c.networks || []).length ? c.networks.map(x => h("div", { class: "mono" }, h("span", { class: "dot", style: `display:inline-block;margin-right:6px;background:${netColor(x.name)}` }), x.name, x.ip ? "  " + x.ip : "", x.aliases?.length ? h("span", { class: "faint" }, "  as " + x.aliases.join(", ")) : null)) : "–"),
+        row("Mounts", (c.mounts || []).length ? c.mounts.map(m => h("div", { class: "mono" }, `${m.type} ${(m.name || m.source || "").replace(base, "./")} → ${m.destination}${m.rw ? "" : " (ro)"}`)) : "–"),
+        row("Depends on", (c.dependsOn || []).join(", ") || "–"),
+      ))))
+      : [h("div", { class: "box" + (focus === n.name ? " focus" : "") }, h("div", { class: "box-head" }, h("span", { class: "dot " + st.cls }), h("b", {}, n.name), h("span", { class: "right" }, st.label)),
+          h("div", { style: "padding:10px 14px" }, h("table", { class: "mini" },
+            row("Image", n.desired?.image || (n.desired?.build ? "built from Dockerfile" : "–")),
+            row("Ports", (n.desired?.ports || []).join(", ") || "–"),
+            row("Volumes", (n.desired?.volumes || []).map(v => `${v.source || "anonymous"} → ${v.target}`).join(", ") || "–"),
+            row("Depends on", (n.desired?.dependsOn || []).join(", ") || "–"))))];
+    return h("div", { class: "section" }, h("h4", {}, n.name, n.containers.length > 1 ? ` · ${n.containers.length} replicas` : ""), boxes);
+  });
+}
+function row(k, v) { return h("tr", {}, h("td", {}, k), h("td", {}, v)); }
+
+function loadHistory(app, force) {
+  const key = app.server.name + "/" + app.name;
+  if (state.history[key] && !force) return;
+  state.history[key] = { loading: true };
+  apiFetch(`/api/history?server=${encodeURIComponent(app.server.name)}&service=${encodeURIComponent(app.name)}`)
+    .then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); })
+    .then(list => (state.history[key] = { list: list || [] }))
+    .catch(e => (state.history[key] = { error: e.message }))
+    .finally(renderPanel);
+}
+
+function panelDeployments(app) {
+  const hist = state.history[app.server.name + "/" + app.name];
+  if (!hist || hist.loading) return h("div", { class: "empty" }, "Loading deployments…");
+  if (hist.error) return h("div", { class: "banner" }, hist.error);
+  if (!hist.list.length) return h("div", { class: "empty" }, "No deployments recorded yet.");
+  const live = app.row?.record;
+  return h("div", { class: "deploys" }, hist.list.map((r, i) => {
+    const active = i === 0 && live && live.deployedAt === r.deployedAt;
+    const prev = hist.list[i + 1];
+    const changed = prev ? (prev.hash === r.hash ? "redeploy, same files" : "files changed") : "first deploy";
+    return h("div", { class: "deploy" },
+      h("span", { class: "dot " + (active ? "c-ok" : "c-none") }),
+      h("div", {}, h("span", { class: "what" }, r.message ? r.message.split("\n")[0] : release(r)), "  ",
+        active ? h("span", { class: "badge c-ok" }, "Active") : h("span", { class: "badge c-none" }, "Superseded")),
+      h("div", { class: "when", title: new Date(r.deployedAt).toLocaleString() }, ago(r.deployedAt)),
+      h("div", { class: "sub" },
+        r.message ? h("b", { class: "muted" }, release(r) + " · ") : null,
+        `${r.deployedBy} · ${changed}`,
+        r.commit ? h("span", {}, " · ", h("code", { title: r.commit }, r.commit.slice(0, 7))) : null,
+        " · ", h("code", { title: r.hash }, short(r.hash, 8)),
+        r.source ? h("span", {}, " · ", h("a", { href: r.source, target: "_blank" }, "CI run")) : null),
+      r.images?.length ? h("div", { class: "sub mono" }, [...new Set(r.images.map(img => `${img.Repository}:${img.Tag} (${short(img.ID, 7)})`))].join("  ")) : null);
+  }));
+}
+
+function panelCompose(app) {
+  if (!app.svc) return h("div", { class: "empty" }, "Not in rollout.json; no local compose file.");
+  return [h("div", { class: "muted", style: "margin-bottom:8px" }, h("code", {}, app.svc.path + "/" + app.svc.composeFile), "  (local working tree)"),
+    h("pre", { class: "code" }, app.svc.compose)];
+}
+
+function panelFiles(app) {
+  if (!app.svc) return h("div", { class: "empty" }, "Not in rollout.json.");
+  return [h("div", { class: "muted", style: "margin-bottom:8px" }, `${app.svc.files.length} files shipped from `, h("code", {}, app.svc.path)),
+    h("pre", { class: "code" }, app.svc.files.join("\n"))];
+}
+
+// ---------- data loading ----------
+// Keep the bootstrap credential out of copied URLs and HTTP referrers.
+const sessionURL = new URL(location.href);
+const sessionToken = sessionURL.searchParams.get("token") || sessionStorage.getItem("rolloutToken") || "";
+if (sessionToken) sessionStorage.setItem("rolloutToken", sessionToken);
+sessionURL.searchParams.delete("token");
+history.replaceState(null, "", sessionURL);
+function apiFetch(url) {
+  return fetch(url, { headers: { "X-Rollout-Token": sessionToken } });
+}
+
+async function loadModel() {
+  const r = await apiFetch("/api/model");
+  if (!r.ok) throw new Error(await r.text());
+  state.model = await r.json();
+}
+
+async function refresh() {
+  if (state.loading) return;
+  state.loading = true;
+  const btn = document.getElementById("refresh");
+  btn.disabled = true; btn.classList.add("spin");
+  document.getElementById("checked").textContent = "checking servers…";
+  try {
+    await loadModel();
+    render();
+    const r = await apiFetch("/api/status");
+    if (!r.ok) throw new Error(await r.text());
+    state.status = (await r.json()) || [];
+    state.statusError = "";
+    state.checkedAt = new Date();
+    // Deployment lists may be stale now; reload the open one.
+    state.history = {};
+  } catch (e) {
+    state.statusError = e.message;
+  } finally {
+    state.loading = false;
+    btn.disabled = false; btn.classList.remove("spin");
+    document.getElementById("checked").textContent = state.checkedAt ? "checked " + state.checkedAt.toLocaleTimeString() : "";
+    render();
+    const app = currentApp();
+    if (app && state.panel.tab === "deployments") loadHistory(app);
+  }
+}
+
+// ---------- wiring ----------
+document.querySelector(".skip").addEventListener("click", e => { e.preventDefault(); document.getElementById("main").focus(); });
+document.getElementById("refresh").addEventListener("click", refresh);
+document.getElementById("home").addEventListener("click", () => navigate());
+document.getElementById("server-select").addEventListener("change", e => navigate(e.target.value));
+document.getElementById("stack-select").addEventListener("change", e => navigate(state.server, e.target.value));
+const auto = document.getElementById("auto");
+auto.checked = state.auto;
+auto.addEventListener("change", () => { state.auto = auto.checked; localStorage.setItem("rollout.auto", state.auto); });
+setInterval(() => { if (state.auto && !document.hidden) refresh(); }, 30000);
+addEventListener("keydown", e => { if (e.key === "Escape" && state.panel) closePanel(); });
+
+function restoreRoute() {
+  readHash(); render();
+  const app = currentApp();
+  if (app && state.panel.tab === "deployments") loadHistory(app);
+}
+addEventListener("hashchange", restoreRoute);
+addEventListener("popstate", restoreRoute);
+readHash();
+render();
+refresh();
+</script>
+</body>
+</html>

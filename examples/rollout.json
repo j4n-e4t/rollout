@@ -1,0 +1,24 @@
+{
+  "defaults": {
+    "user": "deploy",
+    "deployPath": "/opt/rollout"
+  },
+  "servers": {
+    "vps-1": {
+      "host": "vps-1.tail1234.ts.net"
+    },
+    "vps-2": {
+      "host": "203.0.113.11",
+      "port": 2222,
+      "hostKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHJlcGxhY2UtbWUtd2l0aC10aGUtcmVhbC1ob3N0LWtleQ"
+    }
+  },
+  "services": {
+    "whoami": {
+      "servers": [
+        "vps-1",
+        "vps-2"
+      ]
+    }
+  }
+}

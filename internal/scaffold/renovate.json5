@@ -1,0 +1,44 @@
+// Renovate config for a rollout environment repository, written by
+// `rollout init renovate`. Adjust freely: https://docs.renovatebot.com/
+//
+// Renovate's docker-compose manager finds services/*/compose.yaml on its own.
+// Merging a Renovate PR to main runs the deploy workflow, which deploys only
+// the services whose files changed.
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+    // Pin images to digests (image: nginx:1.27@sha256:...). The deploy then
+    // runs exactly the image that was reviewed, a rebuilt tag shows up as a PR
+    // instead of changing silently, and rolling back restores the same image.
+    "docker:pinDigests",
+  ],
+  packageRules: [
+    {
+      // One branch per service directory, so a merge only touches one service.
+      matchManagers: ["docker-compose"],
+      additionalBranchPrefix: "{{parentDir}}-",
+      commitMessageSuffix: "({{parentDir}})",
+    },
+    {
+      // Bundle a service's non-major updates into one PR.
+      matchManagers: ["docker-compose"],
+      matchUpdateTypes: ["minor", "patch", "digest", "pinDigest"],
+      groupName: "images",
+    },
+    {
+      // Major versions often need config changes: they wait for approval on
+      // the Dependency Dashboard issue.
+      matchManagers: ["docker-compose"],
+      matchUpdateTypes: ["major"],
+      dependencyDashboardApproval: true,
+    },
+    // Uncomment to merge digest and patch updates automatically once checks
+    // pass. Merging deploys them.
+    // {
+    //   matchManagers: ["docker-compose"],
+    //   matchUpdateTypes: ["digest", "patch"],
+    //   automerge: true,
+    // },
+  ],
+}
