@@ -14,14 +14,31 @@ import (
 )
 
 // presentation is local to a command so embedded callers can use separate writers.
-type presentation struct{ color, icons bool }
+type presentation struct {
+	color, icons bool
+	// width is the terminal's column count; 0 means unlimited (pipes, files).
+	width int
+}
 
 func (g *globalFlags) presentation(cfg *config.Config, out io.Writer) presentation {
-	terminal := false
+	terminal, width := false, 0
 	if f, ok := out.(interface{ Fd() uintptr }); ok {
 		terminal = term.IsTerminal(int(f.Fd()))
+		if terminal {
+			width, _, _ = term.GetSize(int(f.Fd()))
+		}
 	}
-	return outputPresentation(cfg.Output, g.plain, terminal)
+	p := outputPresentation(cfg.Output, g.plain, terminal)
+	p.width = width
+	return p
+}
+
+// fit cuts s to the terminal width so it never wraps.
+func (p presentation) fit(s string) string {
+	if p.width <= 0 || ansi.StringWidth(s) <= p.width {
+		return s
+	}
+	return ansi.Truncate(s, p.width-1, "…")
 }
 
 func outputPresentation(opts config.Output, plain, terminal bool) presentation {
@@ -110,7 +127,26 @@ func (p presentation) state(s string) string {
 
 // table measures terminal cells, excluding ANSI escapes and accounting for
 // Nerd Font glyphs. text/tabwriter counts escapes as visible characters.
-type table struct{ rows [][]string }
+// Styled output draws a rounded border; plain output stays aligned columns
+// that grep and awk can read.
+type table struct {
+	rows   [][]string
+	header bool
+	p      presentation
+}
+
+func (p presentation) table(header ...string) *table {
+	t := &table{p: p}
+	if len(header) > 0 {
+		for i := range header {
+			header[i] = p.paint("1", header[i])
+		}
+		t.rows, t.header = [][]string{header}, true
+	}
+	return t
+}
+
+func (p presentation) bordered() bool { return p.color || p.icons }
 
 func (t *table) row(cells ...string) { t.rows = append(t.rows, cells) }
 func (t *table) print(out io.Writer) error {
@@ -125,26 +161,84 @@ func (t *table) print(out io.Writer) error {
 			}
 		}
 	}
-	for _, row := range t.rows {
-		for i, cell := range row {
-			if _, err := io.WriteString(out, cell); err != nil {
-				return err
+	border := t.p.bordered()
+	t.shrink(widths, border)
+	var b strings.Builder
+	rule := func(left, mid, right string) {
+		var segs []string
+		for _, w := range widths {
+			segs = append(segs, strings.Repeat("─", w+2))
+		}
+		b.WriteString(t.p.paint("90", left+strings.Join(segs, mid)+right) + "\n")
+	}
+	if border {
+		rule("╭", "┬", "╮")
+	}
+	for r, row := range t.rows {
+		for i := range widths {
+			cell := ""
+			if i < len(row) {
+				cell = row[i]
 			}
-			if i < len(row)-1 {
-				if _, err := io.WriteString(out, strings.Repeat(" ", widths[i]-ansi.StringWidth(cell)+2)); err != nil {
-					return err
-				}
+			if ansi.StringWidth(cell) > widths[i] {
+				cell = ansi.Truncate(cell, widths[i]-1, "…")
+			}
+			pad := strings.Repeat(" ", widths[i]-ansi.StringWidth(cell))
+			switch {
+			case border:
+				b.WriteString(t.p.paint("90", "│") + " " + cell + pad + " ")
+			case i < len(widths)-1:
+				b.WriteString(cell + pad + "  ")
+			default:
+				b.WriteString(cell)
 			}
 		}
-		if _, err := fmt.Fprintln(out); err != nil {
-			return err
+		if border {
+			b.WriteString(t.p.paint("90", "│"))
+		}
+		b.WriteString("\n")
+		if border && r == 0 && t.header && len(t.rows) > 1 {
+			rule("├", "┼", "┤")
 		}
 	}
-	return nil
-}
-func (p presentation) header(t *table, cells ...string) {
-	for i := range cells {
-		cells[i] = p.paint("1;90", cells[i])
+	if border {
+		rule("╰", "┴", "╯")
 	}
-	t.row(cells...)
+	_, err := io.WriteString(out, b.String())
+	return err
 }
+
+// shrink narrows the widest columns until the table fits the terminal, so
+// long cells are cut with "…" instead of wrapping and breaking the layout.
+func (t *table) shrink(widths []int, border bool) {
+	if t.p.width <= 0 || len(widths) == 0 {
+		return
+	}
+	total := 2 * (len(widths) - 1)
+	if border {
+		total = 3*len(widths) + 1
+	}
+	for _, w := range widths {
+		total += w
+	}
+	for total > t.p.width {
+		widest := 0
+		for i, w := range widths {
+			if w > widths[widest] {
+				widest = i
+			}
+		}
+		if widths[widest] <= 8 {
+			return // too narrow to help; let it wrap
+		}
+		widths[widest]--
+		total--
+	}
+}
+
+// heading prints a section title.
+func (p presentation) heading(out io.Writer, s string) {
+	fmt.Fprintln(out, p.paint("1", s))
+}
+
+func (p presentation) dim(s string) string { return p.paint("90", s) }

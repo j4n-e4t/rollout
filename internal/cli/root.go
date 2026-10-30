@@ -38,7 +38,7 @@ func NewRoot() *cobra.Command {
 	pf.StringVarP(&g.configPath, "config", "c", envOr("ROLLOUT_CONFIG", config.DefaultFile), "path to the environment file")
 	pf.StringSliceVarP(&g.identities, "identity", "i", nil, "private key file passed to ssh (repeatable)")
 	pf.BoolVar(&g.insecureHost, "insecure-ignore-host-key", false, "do not verify server host keys")
-	root.AddCommand(newDeployCmd(g), newImportCmd(g), newLsCmd(g), newHistoryCmd(g), newSecretsCmd(g), newLogsCmd(g), newExecCmd(g), newDashboardCmd(g), newInitCmd(g), newValidateCmd(g))
+	root.AddCommand(newDeployCmd(g), newImportCmd(g), newLsCmd(g), newShowCmd(g), newHistoryCmd(g), newSecretsCmd(g), newLogsCmd(g), newExecCmd(g), newDashboardCmd(g), newInitCmd(g), newValidateCmd(g))
 	return root
 }
 
@@ -107,13 +107,21 @@ func ago(t time.Time) string {
 		return "-"
 	}
 	d := time.Since(t)
+	if d < time.Minute {
+		return "just now"
+	}
+	return duration(d) + " ago"
+}
+
+// duration formats d in its largest whole unit ("45s", "9m", "3h", "4d").
+func duration(d time.Duration) string {
 	switch {
 	case d < time.Minute:
-		return "just now"
+		return fmt.Sprintf("%ds", max(0, int(d.Seconds())))
 	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+		return fmt.Sprintf("%dm", int(d.Minutes()))
 	case d < 48*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
+		return fmt.Sprintf("%dh", int(d.Hours()))
 	}
-	return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	return fmt.Sprintf("%dd", int(d.Hours()/24))
 }

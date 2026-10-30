@@ -48,7 +48,7 @@ go install github.com/j4n-e4t/rollout/cmd/rollout@latest
 | Field | Default | Notes |
 | --- | --- | --- |
 | `hooks.beforeDeploy` / `hooks.afterDeploy` | – | Remote shell hooks around each service deployment. Also supported under `services.<name>.hooks`. See [Deploy hooks](#deploy-hooks). |
-| `output.showUnconfigured` | `false` | Include services not assigned to a server in the config in `ls` (including `--wide` and `--json`) and the dashboard. |
+| `output.showUnconfigured` | `false` | Include services not assigned to a server in the config in `ls` (including `--json`) and the dashboard. |
 | `output.plain` | `false` | Disable colors and icons in rollout output, including prompts. |
 | `output.color` / `output.icons` | automatic | Override colors or Nerd Font icons separately. Automatic styling requires a terminal outside CI with `TERM` other than `dumb`. |
 | `defaults.user` / `port` | – | Apply to every server unless overridden. Without a user or port, ssh and `~/.ssh/config` decide. |
@@ -102,7 +102,7 @@ rollout deploy --all --dry-run  # show what would change
 rollout deploy web -r v1.4 -f   # name the release, redeploy even if unchanged
 rollout deploy api -m "Raise worker concurrency to 8"   # describe the deploy
 rollout ls                      # live state and release of every service
-rollout ls web -w               # one service, with its full deploy record
+rollout show web                # containers, volumes, recent deploys, files
 rollout ls --json               # machine-readable
 rollout history [web] [-n 20]   # releases per server: version, commit, when, who
 rollout secrets                 # secrets referenced in .env files, and which are set
@@ -119,20 +119,57 @@ no command-line override.
 `rollout ls` connects to each server and shows, per service and server, its
 state (`running`, `starting`, `unhealthy`, `degraded`, `stopped`,
 `not deployed`, `unreachable`), how many containers are up, the live release
-and when it was deployed. Images are shown only in `--wide` container details
-and `--json` output.
+and when it was deployed. Images and container details are shown by
+`rollout show` and in `--json` output.
 Services found on a server that the config does not assign to it are hidden
 by default. Set `"output": { "showUnconfigured": true }` in `rollout.json` to
-include them, marked `(not in config)`, in text, `--wide` and `--json` output.
+include them, marked `(not in config)`, in text and `--json` output.
 It exits non-zero if any configured
 service isn't running, so it works as a post-deploy check in CI.
 
 ```
-SERVICE  SERVER  STATE                    CONTAINERS  RELEASE  DEPLOYED
-api      vps-1   not deployed             -           -        -
-web      vps-1   running                  1/1         v1.4     5m ago
-web      vps-2   unreachable              -           -        -
+╭─────────┬────────┬──────────────┬────────────┬─────────┬──────────╮
+│ SERVICE │ SERVER │ STATE        │ CONTAINERS │ RELEASE │ DEPLOYED │
+├─────────┼────────┼──────────────┼────────────┼─────────┼──────────┤
+│ api     │ vps-1  │ not deployed │ -          │ -       │ -        │
+│ web     │ vps-1  │ running      │ 1/1        │ v1.4    │ 5m ago   │
+│ web     │ vps-2  │ unreachable  │ -          │ -       │ -        │
+╰─────────┴────────┴──────────────┴────────────┴─────────┴──────────╯
 ```
+
+In a terminal, tables are drawn with borders, colors and icons. Piped, in CI
+or with `--plain`, they are plain aligned columns.
+
+`rollout show <service>` shows one service on each of its servers:
+
+- the live release: message, when and by whom it was deployed, commit, bundle
+  hash and directory
+- each container's state (health check result when it has one), uptime,
+  restarts, image and published ports
+- volumes and bind mounts, with paths inside the service directory shown as
+  `./…`
+- the last 5 deployments
+- the deployed files with their sizes, excluding `preserve` entries
+
+```
+web on vps-1  running  2/2 containers up
+
+  Release    v1.4
+  Message    Raise worker concurrency to 8
+  Deployed   2026-10-29 18:10 (5m ago) by julian@mac
+  Commit     3fa46ac32a7ac705a9aff70a6fc2cf095e2a8cef
+  Bundle     715f6c2d9a10 · rollout 0.0.1
+  Directory  /opt/rollout/web
+
+Containers
+CONTAINER  STATE    UP  RESTARTS  IMAGE         PORTS
+nginx      healthy  5m  0         nginx:alpine  8080→80
+worker     running  5m  0         acme/worker   -
+…
+```
+
+Like `ls`, it exits non-zero if the service isn't running everywhere it's
+configured. Use `--json` for scripts.
 
 Servers are deployed in parallel. Services on the same server are deployed one
 after another, in the order given.
@@ -163,7 +200,7 @@ every deploy user, whether a laptop or CI, sees the same state.
 - `version`: the optional name given with `deploy --release`.
 - `message`: what the deploy is for, like a commit message: `deploy -m "…"`,
   else the subject line of the current Git commit. It's shown in `history`,
-  `ls -w`, the deploy plan and the dashboard.
+  `show`, the deploy plan and the dashboard.
 - `commit` / `dirty`: Git `HEAD` of the environment repo, and whether the service
   directory had uncommitted changes.
 - `hash`: covers every shipped file (path, content, executable bit, symlink
@@ -178,26 +215,32 @@ every deploy user, whether a laptop or CI, sees the same state.
 Before deploying, rollout reads the records and compares hashes. A service is
 **skipped** when its hash and secrets digest match the server's record *and*
 it is running there. New, changed, or stopped services, and servers whose state can't be read,
-are deployed. `--force` deploys everything selected. `--pull always` also bypasses
+are deployed, so `deploy --all` on every push to main only touches what
+changed. `--force` deploys everything selected. `--pull always` also bypasses
 file-based skipping so mutable image tags are refreshed. Status checks the live
 Compose configuration for missing services and replicas before calling a service
 running; inactive profiles are optional and successful one-shot jobs count as complete.
 
 `rollout history [service...]` lists the releases on each server, newest first.
-The live one (from `<service>.json`) is marked `●`, and earlier ones come from
-the history file. Each row shows the release name, commit, time, who deployed
-it, whether the files changed since the previous release (`changed`, `same`,
-or `secrets` when only secret values changed), and the deploy message. Use `-n` to show
-more, `-s` to pick one server, and `--json` for scripts:
+The live one (from `<service>.json`) is marked `live`, and earlier ones come from
+the history file. Each entry shows the commit (or bundle hash), the release name
+if one was given with `--release`, time, who deployed it, whether the files
+changed since the previous release (`files changed`, `no changes`, or
+`secrets changed` when only secret values changed), and the deploy message.
+Use `-n` to show more, `-s` to pick one server, and `--json` for scripts:
 
 ```
 web on vps-1
-     RELEASE  COMMIT   DEPLOYED                     BY          FILES         MESSAGE
-  ●  v3       9be6a12  2026-10-29 19:55  (5m ago)   julian@mac  changed       Add extra.txt to web
-     v2       3fa46ac  2026-10-29 18:09  (2h ago)   julian@mac  same          Redeploy after host reboot
-     v1       b146f33  2026-10-29 18:08  (2h ago)   julian@mac  first deploy  Initial web setup
-``` So `deploy --all` on every
-push to main only touches what changed.
+●  9be6a12 v3 live · 2026-10-29 19:55 (5m ago) · julian@mac · files changed
+│  Add extra.txt to web
+○  3fa46ac v2 · 2026-10-29 18:09 (2h ago) · julian@mac · no changes
+│  Redeploy after host reboot
+○  b146f33 v1 · 2026-10-29 18:08 (2h ago) · julian@mac · first deploy
+   Initial web setup
+```
+
+In a terminal, long lines and wide tables are cut to the window width
+instead of wrapping.
 
 ### Secrets
 

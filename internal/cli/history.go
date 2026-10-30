@@ -129,44 +129,80 @@ func printHistory(out io.Writer, hs []deploy.ServiceHistory, limit int, p presen
 			fmt.Fprintln(out)
 		}
 		fmt.Fprintf(out, "%s on %s\n", p.stack(h.Service), p.server(h.Server, h.HostOS, h.HostDistro))
-		if len(h.Releases) == 0 {
-			fmt.Fprintln(out, "  never deployed")
-			continue
-		}
-		w := &table{}
-		p.header(w, "", "RELEASE", "COMMIT", "DEPLOYED", "", "BY", "FILES", "MESSAGE")
-		for j, r := range h.Releases {
-			marker := ""
-			if h.IsCurrent(r) {
-				marker = p.paint("32", p.icon("\uf058", "current"))
-			}
-			commit := "-"
-			if len(r.Commit) >= 7 {
-				commit = r.Commit[:7]
-			}
-			// Compare with the release before it (next in the list).
-			files := "-" // oldest shown; older ones may exist beyond --limit
-			if j+1 < len(h.Releases) {
-				switch prev := h.Releases[j+1]; {
-				case prev.Hash != r.Hash:
-					files = "changed"
-				case prev.Secrets != r.Secrets:
-					files = "secrets"
-				default:
-					files = "same"
-				}
-			} else if len(h.Releases) < limit {
-				files = "first deploy"
-			}
-			if r.ImportedFrom != "" {
-				files = "imported"
-			}
-			w.row("  "+marker, r.Release(), commit,
-				r.DeployedAt.Local().Format("2006-01-02 15:04"), "("+ago(r.DeployedAt)+")", r.DeployedBy, files, truncate(r.Subject(), 60))
-		}
-		w.print(out)
+		printReleases(out, h, limit, p)
 	}
-	if len(hs) > 0 {
-		fmt.Fprintln(out, "\n"+p.paint("32", p.icon("\uf058", "current"))+" = live release")
+}
+
+// printReleases lists releases newest first, like jj log: a node and
+// summary line per release, then its message.
+//
+//	●  1db7663 v1.4 live · 2026-10-29 22:36 (5m ago) · julian@mac · files changed
+//	│  Raise worker concurrency to 8
+//	○  3fa46ac · 2026-10-29 18:09 (4h ago) · julian@mac · first deploy
+//	   Initial setup
+func printReleases(out io.Writer, h deploy.ServiceHistory, limit int, p presentation) {
+	if len(h.Releases) == 0 {
+		fmt.Fprintln(out, p.dim("  never deployed"))
+		return
+	}
+	for j, r := range h.Releases {
+		node, edge := p.paint("90", "○"), p.paint("90", "│")
+		if !p.bordered() {
+			node, edge = "*", "|"
+		}
+		// Identify the release by commit, else by its bundle hash.
+		id := deploy.ShortHash(r.Hash)
+		if len(r.Commit) >= 7 {
+			id = r.Commit
+		}
+		id = p.paint("33", id[:min(7, len(id))])
+		if r.Dirty {
+			id += p.paint("33", "-dirty")
+		}
+		if r.Version != "" {
+			id += " " + p.paint("1", r.Version)
+		}
+		if h.IsCurrent(r) {
+			if p.bordered() {
+				node = p.paint("32", "●")
+			}
+			id += " " + p.paint("32", "live")
+		}
+		// Compare with the release before it (next in the list).
+		files := ""
+		if j+1 < len(h.Releases) {
+			switch prev := h.Releases[j+1]; {
+			case prev.Hash != r.Hash:
+				files = "files changed"
+			case prev.Secrets != r.Secrets:
+				files = "secrets changed"
+			default:
+				files = p.dim("no changes")
+			}
+		} else if len(h.Releases) < limit {
+			files = "first deploy"
+		}
+		if r.ImportedFrom != "" {
+			files = "imported"
+		}
+		sep := p.dim(" · ")
+		line := id + sep + r.DeployedAt.Local().Format("2006-01-02 15:04") + " " + p.dim("("+ago(r.DeployedAt)+")") + sep + r.DeployedBy
+		if files != "" {
+			line += sep + files
+		}
+		msg := r.Subject()
+		if msg == "" {
+			msg = p.dim("(no message)")
+		}
+		last := j == len(h.Releases)-1
+		cont := edge
+		if last {
+			cont = " "
+		}
+		fmt.Fprintln(out, p.fit(node+"  "+line))
+		fmt.Fprintln(out, p.fit(cont+"  "+msg))
+		if last && len(h.Releases) == limit {
+			fmt.Fprintln(out, p.dim("~")) // older releases exist beyond the limit
+		}
 	}
 }
