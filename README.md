@@ -61,6 +61,9 @@ go install github.com/j4n-e4t/rollout/cmd/rollout@latest
 | `services.<name>.servers` | required | The servers the service runs on. |
 | `services.<name>.wait` | `true` | Run `compose up --wait` so failing or unhealthy containers fail the deploy. |
 | `services.<name>.preserve` | `[]` | Top-level server entries to leave untouched during deployment and rollback; excluded from rollback copies. Must not appear in the service bundle. |
+| `setec.server` | `$SETEC_SERVER` | URL of the [setec](https://github.com/tailscale/setec) server secrets are fetched from. See [Secrets from setec](#secrets-from-setec). |
+| `secrets.<NAME>.setec` | – | The setec secret that fills `${NAME}` references. |
+| `secrets.<NAME>.optional` | `false` | Allow the secret to be missing from setec; the reference's default (e.g. `${NAME:-}`) applies. |
 
 Server and service names must be lowercase (`a-z0-9_-`). The service name is used
 as the Compose project name.
@@ -261,8 +264,10 @@ Many `.gitignore` templates exclude `.env`. Add an exception such as
 `rollout deploy` fills the references in on the deploying machine and ships
 the result; nothing with values in it is written locally. Values come from:
 
-1. environment variables (`DB_PASSWORD=… rollout deploy api` on a laptop), then
-2. `ROLLOUT_SECRETS`, a JSON object. The GitHub Action sets it from its
+1. [setec](#secrets-from-setec), for names mapped under `secrets` in
+   `rollout.json`; these come from setec only, then
+2. environment variables (`DB_PASSWORD=… rollout deploy api` on a laptop), then
+3. `ROLLOUT_SECRETS`, a JSON object. The GitHub Action sets it from its
    `secrets` input, so `secrets: ${{ toJSON(secrets) }}` makes every
    repository secret available. Add one under *Settings → Secrets and
    variables → Actions* with the same name as the reference.
@@ -275,19 +280,75 @@ line breaks included. Other lines are shipped unchanged.
 
 If a required secret is not set, the deploy stops before touching any server
 and names what is missing. `rollout secrets` lists every reference, where it
-is, and whether it is set, `set`, `default` or `MISSING`, which is handy when
-setting up repository secrets:
+is, whether it is set, `set`, `default` or `MISSING`, and where its value
+comes from, which is handy when setting up repository secrets:
 
 ```
-SERVICE  SECRET       STATUS   WHERE
-api      DB_PASSWORD  MISSING  .env:2
-api      LOG_LEVEL    default  .env:4
+SERVICE  SECRET       STATUS   SOURCE             WHERE
+api      DB_PASSWORD  set      setec:prod/api/db  .env:2
+api      API_TOKEN    MISSING  -                  .env:3
+api      LOG_LEVEL    default  -                  .env:4
 ```
 
 On the server, rendered env files are written with mode `0600`. Changing a
 secret's value redeploys the services that use it (the plan says
 `secrets changed`), even when no file changed. The dashboard compares files
 only, since it has no access to the secrets.
+
+#### Secrets from setec
+
+[setec](https://github.com/tailscale/setec) is a secrets server that runs on
+your tailnet and authorizes callers by their Tailscale identity. Map each
+reference to a setec secret in `rollout.json`:
+
+```json
+{
+  "setec": { "server": "https://setec.tail1234.ts.net" },
+  "secrets": {
+    "DB_PASSWORD": { "setec": "prod/api/db-password" },
+    "API_TOKEN": { "setec": "prod/api/token" }
+  }
+}
+```
+
+`rollout deploy` fetches the mapped secrets the deployed services reference,
+once each, and fills them in like any other value: the servers still receive
+rendered `0600` env files and never talk to setec. A mapped secret always
+comes from setec: environment variables and `ROLLOUT_SECRETS` of the same name
+are ignored, so a stale local value cannot slip into a deploy. Without
+`setec.server`, the `SETEC_SERVER` environment variable is used.
+
+The deploying machine must be on the tailnet and granted `get` on the secrets
+in the tailnet policy, e.g.:
+
+```json
+{
+  "src": ["autogroup:admin"],
+  "dst": ["tag:setec"],
+  "app": { "tailscale.com/cap/secrets": [{ "action": ["get"], "secret": ["prod/*"] }] }
+}
+```
+
+A secret that may be missing from setec, like a Tailscale auth key that is
+only needed on first start and deleted afterwards, can be marked optional.
+Give the reference a default so the deploy goes ahead without it:
+
+```json
+"TS_AUTHKEY": { "setec": "infra/setec/ts-authkey", "optional": true }
+```
+
+```sh
+# services/setec/.env
+TS_AUTHKEY=${TS_AUTHKEY:-}
+```
+
+Only "not found" is tolerated; access denied or an unreachable server still
+stops the deploy.
+
+In GitHub Actions, join the tailnet first (e.g. with `tailscale/github-action`
+and a tagged, ephemeral key) and grant that tag. If a secret cannot be fetched
+(access denied, not found, server unreachable), the deploy stops before
+touching any server and says why.
 
 ### Importing existing deployments
 

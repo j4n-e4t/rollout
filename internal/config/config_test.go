@@ -130,3 +130,46 @@ func TestLoadHooks(t *testing.T) {
 		t.Fatalf("hooks not loaded: %+v, %+v", cfg.Hooks, cfg.Services["web"].Hooks)
 	}
 }
+
+func TestSecrets(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "services/web/compose.yaml"), "services: {}\n")
+	load := func(extra string) (*Config, error) {
+		writeFile(t, filepath.Join(dir, "rollout.json"), `{
+			"servers": {"a": {"host": "a"}},
+			"services": {"web": {"servers": ["a"]}}`+extra+`
+		}`)
+		return Load(filepath.Join(dir, "rollout.json"))
+	}
+	c, err := load(`, "setec": {"server": "https://setec.example.ts.net"},
+		"secrets": {"DB_PASSWORD": {"setec": "prod/db"}, "AUTH_KEY": {"setec": "prod/auth", "optional": true}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if db, auth := c.Secrets["DB_PASSWORD"], c.Secrets["AUTH_KEY"]; db.Setec != "prod/db" || db.Optional || auth.Setec != "prod/auth" || !auth.Optional {
+		t.Errorf("Secrets = %+v, %+v", db, auth)
+	}
+	if got := c.SetecServer(); got != "https://setec.example.ts.net" {
+		t.Errorf("SetecServer = %q", got)
+	}
+
+	c, err = load(`, "secrets": {"DB_PASSWORD": {"setec": "prod/db"}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SETEC_SERVER", "https://from-env.ts.net")
+	if got := c.SetecServer(); got != "https://from-env.ts.net" {
+		t.Errorf("SetecServer = %q, want SETEC_SERVER", got)
+	}
+
+	for _, extra := range []string{
+		`, "secrets": {"BAD-NAME": {"setec": "x"}}`,
+		`, "secrets": {"DB": {}}`,
+		`, "setec": {"server": "setec.example.ts.net"}`,
+		`, "secrets": {"DB": {"setec": "x", "vault": "y"}}`,
+	} {
+		if _, err := load(extra); err == nil {
+			t.Errorf("want error for %s", extra)
+		}
+	}
+}

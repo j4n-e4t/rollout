@@ -29,6 +29,10 @@ type Config struct {
 	Defaults Defaults            `json:"defaults"`
 	Servers  map[string]*Server  `json:"servers"`
 	Services map[string]*Service `json:"services"`
+	Setec    *Setec              `json:"setec,omitempty"`
+	// Secrets says where the values of ${NAME} references come from. Names
+	// not listed here come from the environment or ROLLOUT_SECRETS.
+	Secrets map[string]*Secret `json:"secrets,omitempty"`
 
 	// Dir is the directory containing the config file. Service paths are
 	// resolved relative to it.
@@ -58,6 +62,23 @@ type Defaults struct {
 	Port       int    `json:"port,omitempty"`
 	DeployPath string `json:"deployPath,omitempty"`
 	StateDir   string `json:"stateDir,omitempty"`
+}
+
+// Setec configures the setec server (github.com/tailscale/setec) secrets
+// are fetched from. It is reached over the tailnet of the deploying machine.
+type Setec struct {
+	// Server is the setec URL, e.g. https://setec.example.ts.net. Defaults
+	// to the SETEC_SERVER environment variable.
+	Server string `json:"server,omitempty"`
+}
+
+// Secret is the source of one secret.
+type Secret struct {
+	// Setec is the name of the secret in setec, e.g. "prod/api/db-password".
+	Setec string `json:"setec"`
+	// Optional allows the secret to be missing from setec; the reference's
+	// default (e.g. ${NAME:-}) then applies.
+	Optional bool `json:"optional,omitempty"`
 }
 
 type Server struct {
@@ -91,6 +112,9 @@ type Service struct {
 
 	Name string `json:"-"`
 }
+
+// secretNameRe matches the names usable in ${NAME} references.
+var secretNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // nameRe restricts names to what is safe as a directory and compose project name.
 var nameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
@@ -222,7 +246,27 @@ func (c *Config) Validate() error {
 			errs = append(errs, fmt.Errorf("service %q: compose file: %w", name, err))
 		}
 	}
+	if c.Setec != nil && c.Setec.Server != "" && !strings.HasPrefix(c.Setec.Server, "https://") && !strings.HasPrefix(c.Setec.Server, "http://") {
+		errs = append(errs, errors.New("setec.server must be an http(s) URL"))
+	}
+	for _, name := range sortedKeys(c.Secrets) {
+		s := c.Secrets[name]
+		if !secretNameRe.MatchString(name) {
+			errs = append(errs, fmt.Errorf("secret %q: name must match %s", name, secretNameRe))
+		}
+		if s == nil || s.Setec == "" {
+			errs = append(errs, fmt.Errorf("secret %q: setec is required", name))
+		}
+	}
 	return errors.Join(errs...)
+}
+
+// SetecServer returns setec.server, or SETEC_SERVER when it is not set.
+func (c *Config) SetecServer() string {
+	if c.Setec != nil && c.Setec.Server != "" {
+		return c.Setec.Server
+	}
+	return os.Getenv("SETEC_SERVER")
 }
 
 // Address formats the server as user@host:port, omitting what ssh decides.

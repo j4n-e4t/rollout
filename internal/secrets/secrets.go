@@ -1,7 +1,8 @@
 // Package secrets fills in references like ${DB_PASSWORD} in a service's
 // committed env files at deploy time. The repository holds only the
-// references; the values come from the deploying machine's environment or,
-// in GitHub Actions, from repository secrets passed as ROLLOUT_SECRETS.
+// references; the values come from the deploying machine's environment, from
+// setec (see Resolver) or, in GitHub Actions, from repository secrets passed
+// as ROLLOUT_SECRETS.
 //
 // Env files are files named ".env" or "*.env" anywhere in the service
 // directory. Inside them, in unquoted and double-quoted values:
@@ -22,7 +23,6 @@ import (
 	"crypto/pbkdf2"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -42,19 +42,11 @@ type Lookup func(name string) (string, bool)
 // FromEnv looks names up in the process environment, then in the JSON object
 // in ROLLOUT_SECRETS.
 func FromEnv() (Lookup, error) {
-	var bag map[string]string
-	if raw := os.Getenv(EnvVar); strings.TrimSpace(raw) != "" {
-		if err := json.Unmarshal([]byte(raw), &bag); err != nil {
-			return nil, fmt.Errorf("%s must be a JSON object of strings: %w", EnvVar, err)
-		}
+	r, err := NewResolver(nil, nil)
+	if err != nil {
+		return nil, err
 	}
-	return func(name string) (string, bool) {
-		if v, ok := os.LookupEnv(name); ok {
-			return v, true
-		}
-		v, ok := bag[name]
-		return v, ok
-	}, nil
+	return r.Lookup, nil
 }
 
 // IsEnvFile reports whether a path in a service directory is an env file.

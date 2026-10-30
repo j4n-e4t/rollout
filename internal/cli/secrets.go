@@ -14,6 +14,17 @@ import (
 type secretRow struct {
 	Service string `json:"service"`
 	secrets.Ref
+	Source string `json:"source,omitempty"`
+}
+
+// newResolver takes the names mapped under "secrets" in rollout.json from
+// setec, and other names from the environment, then ROLLOUT_SECRETS.
+func newResolver(cfg *config.Config) (*secrets.Resolver, error) {
+	refs := map[string]secrets.SetecRef{}
+	for name, s := range cfg.Secrets {
+		refs[name] = secrets.SetecRef{Name: s.Setec, Optional: s.Optional}
+	}
+	return secrets.NewResolver(&secrets.Setec{Server: cfg.SetecServer()}, refs)
 }
 
 func newSecretsCmd(g *globalFlags) *cobra.Command {
@@ -30,10 +41,15 @@ Commit .env files (or any *.env) with references instead of values:
   DATABASE_URL=postgres://app:${DB_PASSWORD}@db/app
   LOG_LEVEL=${LOG_LEVEL:-info}
 
-rollout deploy fills them in from environment variables, then from the JSON
-object in ROLLOUT_SECRETS. In GitHub Actions, pass the repository secrets to
-the action with secrets: ${{ toJSON(secrets) }}. Exits non-zero if a required
-secret is missing.`,
+rollout deploy takes names mapped in rollout.json from setec only:
+
+  "setec": { "server": "https://setec.example.ts.net" },
+  "secrets": { "DB_PASSWORD": { "setec": "prod/api/db-password" } }
+
+Other names come from environment variables, then from the JSON object in
+ROLLOUT_SECRETS. In GitHub Actions, pass the repository secrets to the action
+with secrets: ${{ toJSON(secrets) }}. Exits non-zero if a required secret is
+missing or cannot be fetched from setec.`,
 		ValidArgsFunction: completeServices(g),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.Load(g.configPath)
@@ -44,7 +60,7 @@ secret is missing.`,
 			if len(services) == 0 {
 				services = cfg.ServiceNames()
 			}
-			lookup, err := secrets.FromEnv()
+			res, err := newResolver(cfg)
 			if err != nil {
 				return err
 			}
@@ -55,13 +71,13 @@ secret is missing.`,
 				if !ok {
 					return fmt.Errorf("unknown service %q", name)
 				}
-				r, err := secrets.Render(cfg.ServiceDir(svc), name, lookup)
+				r, err := secrets.Render(cfg.ServiceDir(svc), name, res.Lookup)
 				if err != nil {
 					return fmt.Errorf("service %q: %w", name, err)
 				}
 				missing += len(r.Missing())
 				for _, ref := range r.Refs {
-					rows = append(rows, secretRow{Service: name, Ref: ref})
+					rows = append(rows, secretRow{Service: name, Ref: ref, Source: res.Source(ref.Name)})
 				}
 			}
 
@@ -79,18 +95,24 @@ secret is missing.`,
 				fmt.Fprintln(out, "No secret references in .env files.")
 			} else {
 				w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-				fmt.Fprintln(w, "SERVICE\tSECRET\tSTATUS\tWHERE")
+				fmt.Fprintln(w, "SERVICE\tSECRET\tSTATUS\tSOURCE\tWHERE")
 				for _, r := range rows {
-					status := "set"
+					status, source := "set", r.Source
 					switch {
 					case !r.Set && r.HasDefault:
 						status = "default"
 					case !r.Set:
 						status = "MISSING"
 					}
-					fmt.Fprintf(w, "%s\t%s\t%s\t%s:%d\n", r.Service, r.Name, status, r.File, r.Line)
+					if source == "" {
+						source = "-"
+					}
+					fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s:%d\n", r.Service, r.Name, status, source, r.File, r.Line)
 				}
 				w.Flush()
+			}
+			if err := res.Err(); err != nil {
+				return err
 			}
 			if missing > 0 {
 				return fmt.Errorf("%d required secret(s) not set", missing)

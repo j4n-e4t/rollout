@@ -11,7 +11,6 @@ import (
 
 	"github.com/j4n-e4t/rollout/internal/config"
 	"github.com/j4n-e4t/rollout/internal/deploy"
-	"github.com/j4n-e4t/rollout/internal/secrets"
 )
 
 type deployFlags struct {
@@ -41,7 +40,7 @@ running there, are skipped; --force deploys them anyway. Images are pulled
 before the running release is touched.
 
 References like ${DB_PASSWORD} in a service's .env files are filled in from
-the environment or ROLLOUT_SECRETS before shipping; see rollout secrets.`,
+setec, the environment or ROLLOUT_SECRETS before shipping; see rollout secrets.`,
 		Example: `  rollout deploy                  # pick interactively
   rollout deploy web api          # deploy two services
   rollout deploy --all --dry-run  # show what would change
@@ -95,11 +94,15 @@ func runDeploy(cmd *cobra.Command, g *globalFlags, f *deployFlags, args []string
 		return fmt.Errorf(`--pull must be "missing" or "always", not %q`, f.pull)
 	}
 
-	lookup, err := secrets.FromEnv()
+	resolver, err := newResolver(cfg)
 	if err != nil {
 		return err
 	}
-	steps, err := deploy.Plan(cfg, services, lookup)
+	steps, err := deploy.Plan(cfg, services, resolver.Lookup)
+	// A setec failure explains a "missing" secret better than Plan can.
+	if serr := resolver.Err(); serr != nil {
+		return serr
+	}
 	if err != nil {
 		return err
 	}
