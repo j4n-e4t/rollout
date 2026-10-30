@@ -17,7 +17,8 @@ inputs:
   secrets:
     description: >-
       JSON object of secrets for ${NAME} references in services' .env files.
-      Pass ${{ toJSON(secrets) }} to make every repository secret available.
+      Pass toJSON(secrets) in an expression to make every repository secret
+      available.
     required: false
 
 runs:
